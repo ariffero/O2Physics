@@ -54,7 +54,6 @@ struct fwdMuonsUPC {
   using CandidatesFwd = soa::Join<o2::aod::UDCollisions, o2::aod::UDCollisionsSelsFwd>;
   using ForwardTracks = soa::Join<o2::aod::UDFwdTracks, o2::aod::UDFwdTracksExtra>;
   using udZDCreduced = o2::aod::UDZdcsReduced::iterator;
-  //Preslice<aod::UDZdcsReduced> zdcPerUDCollPreslice = udZDCreduced::udCollisionId;
 
   Produces<o2::aod::MassPt> mptSel;
   
@@ -138,7 +137,7 @@ struct fwdMuonsUPC {
 
   //FUNCTIONS
 
-  //template function that fill a map with the collision id of each udcollision as key
+  //template function that fills a map with the collision id of each udcollision as key
   //and a vector with the tracks
   //map == (key, element) == (udCollisionId, vector of trks)
   template <typename TTracks>
@@ -153,6 +152,7 @@ struct fwdMuonsUPC {
     }
   }
 
+  // struct used to store the ZDC info in a map
   struct ZDCinfo{
     float timeA;
     float timeC;
@@ -161,6 +161,8 @@ struct fwdMuonsUPC {
     int32_t id;
   };
 
+  //function that fills a map with the collision id of each udcollision as key
+  //and a ZDCinfo struct with the ZDC information 
   void collectCandZDCInfo(std::unordered_map<int32_t, ZDCinfo>& zdcPerCand, o2::aod::UDZdcsReduced& ZDCs){
     
     for(auto &zdc: ZDCs){
@@ -178,11 +180,34 @@ struct fwdMuonsUPC {
   }
 
 
+  // function to select muon tracks
+  bool isMuonSelected(const ForwardTracks::iterator& fwdTrack)
+  {
+    float rAbs = fwdTrack.rAtAbsorberEnd();
+    float pDca = fwdTrack.pDca();
+    TLorentzVector p;
+    p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
+    float eta = p.Eta();
+    float pt = p.Pt();
+    float pDcaMax = rAbs < kRAbsMid ? kPDca1 : kPDca2;
+    
+    if (eta < kEtaMin || eta > kEtaMax)
+      return false;
+    if (pt < kPtMin)
+      return false;
+    if (rAbs < kRAbsMin || rAbs > kRAbsMax)
+      return false;
+    if (pDca > pDcaMax)
+      return false;
+    return true;
+  }
+
+
   //function that processes the candidates:
   //it applies V0 selection, trk selection, and fills the histograms
-  void processCandidateFwd(CandidatesFwd::iterator const& cand,
-                           const ForwardTracks::iterator& tr1, const ForwardTracks::iterator& tr2)
-  {
+  void processCand(CandidatesFwd::iterator const& cand,
+                   const ForwardTracks::iterator& tr1, const ForwardTracks::iterator& tr2,
+                   ZDCinfo& zdc){
     //V0 selection
     const auto& ampsV0A = cand.amplitudesV0A();
     const auto& ampsRelBCsV0A = cand.ampRelBCsV0A();
@@ -231,78 +256,42 @@ struct fwdMuonsUPC {
     registry.fill(HIST("hCharge"),tr1.sign());
     registry.fill(HIST("hCharge"),tr2.sign());
 
+    //zdc info
+    registry.fill(HIST("hTimeZNA"), zdc.timeA);
+    registry.fill(HIST("hTimeZNC"), zdc.timeC);
+
+    registry.fill(HIST("hEnergyZN"),zdc.enA,zdc.enC);
+
     // restric the kine
     if (p.M() > 2 && p.M() < 6 && p.Pt() < 5) mptSel(p.M(),p.Pt());
   }
 
-  
 
-  bool isMuonSelected(const ForwardTracks::iterator& fwdTrack)
-  {
-    float rAbs = fwdTrack.rAtAbsorberEnd();
-    float pDca = fwdTrack.pDca();
-    TLorentzVector p;
-    p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
-    float eta = p.Eta();
-    float pt = p.Pt();
-    float pDcaMax = rAbs < kRAbsMid ? kPDca1 : kPDca2;
-    
-    if (eta < kEtaMin || eta > kEtaMax)
-      return false;
-    if (pt < kPtMin)
-      return false;
-    if (rAbs < kRAbsMin || rAbs > kRAbsMax)
-      return false;
-    if (pDca > pDcaMax)
-      return false;
-    return true;
-  }
-
-/*
-  void processCandidateFwdWithZDC(CandidatesFwd::iterator const& cand,
-                           const ForwardTracks::iterator& tr1, const ForwardTracks::iterator& tr2,
-                           ZDCinfo& zdc)
-  {
-    
-    //LOGP(info, "before processCandidateFwd");
-    processCandidateFwd(cand, tr1, tr2);
-    //LOGP(info, "after processCandidateFwd");
-    registry.fill(HIST("hTimeZNA"), zdc.timeA);
-
-    //LOGP(info, "zdc = {}", zdc.timeA);
-  }
-
-  void prcWZDC(CandidatesFwd::iterator const& cand,
-                           const ForwardTracks::iterator& tr1, const ForwardTracks::iterator& tr2,
-                           o2::aod::UDZdcsReduced::iterator& zdc){
-
-                           }
-*/
   //PROCESS FUNCTION
   void process(CandidatesFwd const& eventCandidates,
                o2::aod::UDZdcsReduced& ZDCs,
                ForwardTracks const& fwdTracks)
   {
 
-    //for (const auto& item : tracksPerCand) {
-    //  int32_t candID = item.first;
-    //  LOGP(info, "candID = {}", candID);
-    //}
-//
-    //for (const auto& item : zdcPerCand) {
-    //  int32_t candID = item.first;
-    //  LOGP(info, "zdcID = {}", candID);
-    //}
-
-    //for(auto & candidate : eventCandidates){
-    //  auto groupedUdCollZDC = ZDCs.sliceBy(zdcPerUDCollPreslice, eventCandidates.udCollisionId());
-    //}
-
+    // map with the tracks
     std::unordered_map<int32_t, std::vector<int32_t>> tracksPerCand;
     collectCandIDs(tracksPerCand, fwdTracks);
 
-    //std::unordered_map<int32_t, ZDCinfo> zdcPerCand;
-    //collectCandZDCInfo(zdcPerCand, ZDCs);
+    //map with the ZDC info
+    std::unordered_map<int32_t, ZDCinfo> zdcPerCand;
+    collectCandZDCInfo(zdcPerCand, ZDCs);
+
+    int match = 0;
+    int tot = 0;
+    for (const auto& item : tracksPerCand) {
+      
+      int32_t candID = item.first;
+      match = match + zdcPerCand.count(candID);
+      tot++;
+      
+    }
+    //LOGP(info,"matches = {}",match);
+    //LOGP(info,"tot = {}",tot);
 
     for (const auto& item : tracksPerCand) {
       int32_t trId1 = item.second[0];
@@ -311,22 +300,11 @@ struct fwdMuonsUPC {
       auto cand = eventCandidates.iteratorAt(candID);
       auto tr1 = fwdTracks.iteratorAt(trId1);
       auto tr2 = fwdTracks.iteratorAt(trId2);
-      //if (zdcPerCand.find(candID) == zdcPerCand.end()) {
-      //  LOGP(info,"id = {}",candID);
-      //  return;
-      //}
-      //auto zdc = ZDCs.iteratorAt(candID);
-      //prcWZDC(cand, tr1, tr2,zdc);
-      processCandidateFwd(cand, tr1, tr2);
-      //LOGP(info, "BC zdc size = {}", cand.size());
-      //if (zdcPerCand.find(candID) == zdcPerCand.end()) return;
-      //auto zdcItem = zdcPerCand[candID];
-      //registry.fill(HIST("hTimeZNA"), zdcItem.timeA);
-
-      /*if (zdcPerCand.find(candID) == zdcPerCand.end()) return;
-      auto zdcItem = zdcPerCand[candID];
-
-      processCandidateFwdWithZDC(cand, tr1, tr2, zdcItem);*/
+      if(zdcPerCand.count(candID)==0) continue;
+      auto zdc = zdcPerCand.at(candID);
+      
+      processCand(cand, tr1, tr2, zdc);
+      
     }
 
     
