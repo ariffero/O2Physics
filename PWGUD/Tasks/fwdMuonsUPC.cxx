@@ -19,16 +19,37 @@
 
 #include "TLorentzVector.h"
 #include "TSystem.h"
+#include "math.h"
 
 
-namespace mpt {
+
+namespace dimu {
+  // dimuon
   DECLARE_SOA_COLUMN(M, m, float);
   DECLARE_SOA_COLUMN(Pt, pt, float);
+  DECLARE_SOA_COLUMN(Rap, rap, float);
+  DECLARE_SOA_COLUMN(Phi, phi, float);
+  // tracks positive (p) and negative (n)
+  DECLARE_SOA_COLUMN(Ptp, ptp, float);
+  DECLARE_SOA_COLUMN(Etap, etap, float);
+  DECLARE_SOA_COLUMN(Phip, phip, float);
+  DECLARE_SOA_COLUMN(Ptn, ptn, float);
+  DECLARE_SOA_COLUMN(Etan, etan, float);
+  DECLARE_SOA_COLUMN(Phin, phin, float);
+  // zn
+  DECLARE_SOA_COLUMN(Tzna, tzna, float);
+  DECLARE_SOA_COLUMN(Ezna, ezna, float);
+  DECLARE_SOA_COLUMN(Tznc, tznc, float);
+  DECLARE_SOA_COLUMN(Eznc, eznc, float);
+  DECLARE_SOA_COLUMN(Nclass, nclass, int);
 }
 
 namespace o2::aod {
-  DECLARE_SOA_TABLE(MassPt, "AOD", "MASSPT",
-		    mpt::M, mpt::Pt);
+  DECLARE_SOA_TABLE(DiMu, "AOD", "DIMU",
+		    dimu::M, dimu::Pt, dimu::Rap, dimu::Phi,
+		    dimu::Ptp, dimu::Etap, dimu::Phip,
+		    dimu::Ptn, dimu::Etan, dimu::Phin,
+		    dimu::Tzna, dimu::Ezna, dimu::Tznc, dimu::Eznc, dimu::Nclass);
 }
 
 using namespace o2;
@@ -53,12 +74,14 @@ struct fwdMuonsUPC {
 
   using CandidatesFwd = soa::Join<o2::aod::UDCollisions, o2::aod::UDCollisionsSelsFwd>;
   using ForwardTracks = soa::Join<o2::aod::UDFwdTracks, o2::aod::UDFwdTracksExtra>;
-  using udZDCreduced = o2::aod::UDZdcsReduced::iterator;
 
-  Produces<o2::aod::MassPt> mptSel;
+  Produces<o2::aod::DiMu> dimuSel;
   
   // defining histograms using histogram registry
-  HistogramRegistry registry{"registry", {}, OutputObjHandlingPolicy::AnalysisObject};
+  HistogramRegistry registry{"registry", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+  HistogramRegistry reg0n0n{"reg0n0n", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+  HistogramRegistry regXn0n{"regXn0n", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+  HistogramRegistry regXnXn{"regXnXn", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
 
   //CONFIGURABLES
   //pT of muon pairs
@@ -75,8 +98,8 @@ struct fwdMuonsUPC {
   Configurable<float> highEta{"highEta", -2., "upper limit in eta histo"};
   //rapidity of muon pairs
   Configurable<int> nBinsRapidity{"nBinsRapidity", 250, "N bins in rapidity histo"};
-  Configurable<float> lowRapidity{"lowRapidity", -4., "lower limit in rapidity histo"};
-  Configurable<float> highRapidity{"highRapidity", -2.5, "upper limit in rapidity histo"};
+  Configurable<float> lowRapidity{"lowRapidity", -4.5, "lower limit in rapidity histo"};
+  Configurable<float> highRapidity{"highRapidity", -2., "upper limit in rapidity histo"};
   //phi of muon pairs
   Configurable<int> nBinsPhi{"nBinsPhi", 600, "N bins in phi histo"};
   Configurable<float> lowPhi{"lowPhi", -TMath::Pi(), "lower limit in phi histo"};
@@ -98,17 +121,29 @@ struct fwdMuonsUPC {
   Configurable<float> lowEnZN{"lowEnZN",-50.,"lower limit in ZN energy histo"};
   Configurable<float> highEnZN{"highEnZN",250.,"upper limit in ZN energy histo"};
 
+  //configuarble rapidity cuts
+  Configurable<float> yCutLow{"yCutLow", -4, "Lower cut in pair rapidity"};
+  Configurable<float> yCutUp{"yCutUp",   -2.5, "Upper cut in pair rapidity"};
 
   void init(InitContext&)
   {
+    // binning of pT axis fr fit
+    std::vector<double> ptFitBinning = {
+      0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10,
+      0.11, 0.12, 0.13, 0.14, 0.15, 0.175, 0.20, 0.25, 0.30, 0.40, 0.50,
+      0.60, 0.70, 0.80, 0.90, 1.00, 1.20, 1.40, 1.60, 1.80, 2.00, 2.50,
+      3.00, 3.50
+    };
+
     //axis
     const AxisSpec axisPt{nBinsPt, lowPt, highPt, "#it{p}_{T} GeV/#it{c}"};
+    const AxisSpec axisPtFit = {ptFitBinning, "#it{p}_{T} (GeV/c)"};
     const AxisSpec axisMass{nBinsMass, lowMass, highMass, "m_{#mu#mu} GeV/#it{c}^{2}"};
     const AxisSpec axisEta{nBinsEta, lowEta, highEta, "#eta"};
     const AxisSpec axisRapidity{nBinsRapidity, lowRapidity, highRapidity, "Rapidity"};
     const AxisSpec axisPhi{nBinsPhi, lowPhi, highPhi, "#varphi"};
     const AxisSpec axisPtSingle{nBinsPtSingle, lowPtSingle, highPtSingle, "#it{p}_{T}_{ trk} GeV/#it{c}"};
-    const AxisSpec axisTimeZN{500,-5,5,"ZDC time (ns)"};
+    const AxisSpec axisTimeZN{200,-10,10,"ZDC time (ns)"};
     const AxisSpec axisEnergyZNA{nBinsZDCen,lowEnZN,highEnZN,"ZNA energy (TeV)"};
     const AxisSpec axisEnergyZNC{nBinsZDCen,lowEnZN,highEnZN,"ZNC energy (TeV)"};
     const AxisSpec axisEtaSingle{nBinsEtaSingle, lowEtaSingle, highEtaSingle, "#eta_{trk}"};
@@ -117,6 +152,7 @@ struct fwdMuonsUPC {
     //histos
     registry.add("hMass", "Ivariant mass of muon pairs;;#counts", kTH1D, {axisMass});
     registry.add("hPt", "Transverse momentum mass of muon pairs;;#counts", kTH1D, {axisPt});
+    registry.add("hPtFit", "Transverse momentum mass of muon pairs;;#counts", kTH1D, {axisPtFit});
     registry.add("hEta", "Pseudorapidty of muon pairs;;#counts", kTH1D, {axisEta});
     registry.add("hRapidity", "Rapidty of muon pairs;;#counts", kTH1D, {axisRapidity});
     registry.add("hPhi", "#varphi of muon pairs;;#counts", kTH1D, {axisPhi});
@@ -132,6 +168,25 @@ struct fwdMuonsUPC {
     registry.add("hTimeZNA","ZNA Times;;#counts",kTH1D,{axisTimeZN});
     registry.add("hTimeZNC","ZNC Times;;#counts",kTH1D,{axisTimeZN});
     registry.add("hEnergyZN","ZNA vs ZNC energy",kTH2D,{axisEnergyZNA,axisEnergyZNC});
+
+    reg0n0n.add("hMass", "Ivariant mass of muon pairs - 0n0n;;#counts", kTH1D, {axisMass});
+    reg0n0n.add("hPt", "Transverse momentum mass of muon pairs - 0n0n;;#counts", kTH1D, {axisPt});
+    reg0n0n.add("hEta", "Pseudorapidty of muon pairs - 0n0n;;#counts", kTH1D, {axisEta});
+    reg0n0n.add("hRapidity", "Rapidty of muon pairs - 0n0n;;#counts", kTH1D, {axisRapidity});
+    reg0n0n.add("hPtFit", "Transverse momentum mass of muon pairs - 0n0n;;#counts", kTH1D, {axisPtFit});
+
+
+    regXn0n.add("hMass", "Ivariant mass of muon pairs - Xn0n;;#counts", kTH1D, {axisMass});
+    regXn0n.add("hPt", "Transverse momentum mass of muon pairs - Xn0n;;#counts", kTH1D, {axisPt});
+    regXn0n.add("hEta", "Pseudorapidty of muon pairs - Xn0n;;#counts", kTH1D, {axisEta});
+    regXn0n.add("hRapidity", "Rapidty of muon pairs - Xn0n;;#counts", kTH1D, {axisRapidity});
+    regXn0n.add("hPtFit", "Transverse momentum mass of muon pairs - Xn0n;;#counts", kTH1D, {axisPtFit});
+
+    regXnXn.add("hMass", "Ivariant mass of muon pairs - XnXn;;#counts", kTH1D, {axisMass});
+    regXnXn.add("hPt", "Transverse momentum mass of muon pairs - XnXn;;#counts", kTH1D, {axisPt});
+    regXnXn.add("hEta", "Pseudorapidty of muon pairs - XnXn;;#counts", kTH1D, {axisEta});
+    regXnXn.add("hRapidity", "Rapidty of muon pairs - XnXn;;#counts", kTH1D, {axisRapidity});
+    regXnXn.add("hPtFit", "Transverse momentum mass of muon pairs - XnXn;;#counts", kTH1D, {axisPtFit});
   }
 
 
@@ -170,12 +225,18 @@ struct fwdMuonsUPC {
       if (candId < 0) {
         continue;
       }
+
       zdcPerCand[candId].timeA = zdc.timeZNA();
       zdcPerCand[candId].timeC = zdc.timeZNC();
-      zdcPerCand[candId].enA = zdc.energyCommonZNA();
-      zdcPerCand[candId].enC = zdc.energyCommonZNC();
+      zdcPerCand[candId].enA   = zdc.energyCommonZNA();
+      zdcPerCand[candId].enC   = zdc.energyCommonZNC();
 
-      //LOGP(info, "zdc = {}", zdc.timeZNA());
+      //take care of the infinity
+      if(std::isinf(zdcPerCand[candId].timeA)) zdcPerCand[candId].timeA = -999;
+      if(std::isinf(zdcPerCand[candId].timeC)) zdcPerCand[candId].timeC = -999;
+      if(std::isinf(zdcPerCand[candId].enA  )) zdcPerCand[candId].enA   = -999;
+      if(std::isinf(zdcPerCand[candId].enC  )) zdcPerCand[candId].enC   = -999;
+
     }
   }
 
@@ -239,7 +300,60 @@ struct fwdMuonsUPC {
     if (nMIDs != 2)
       return;
     
-    //fill the histos
+    // cuts on pair kinematics
+    if (!(p.M() > 2 && p.M() < 6 && p.Pt() < 5)) return;
+
+    //select rapidity ranges
+    if(p.Rapidity()<yCutLow) return;
+    if(p.Rapidity()>yCutUp)  return;
+
+    //zdc info
+    if(TMath::Abs(zdc.timeA)<10) registry.fill(HIST("hTimeZNA"), zdc.timeA);
+    if(TMath::Abs(zdc.timeC)<10) registry.fill(HIST("hTimeZNC"), zdc.timeC);
+    registry.fill(HIST("hEnergyZN"),zdc.enA,zdc.enC);
+
+    //divide the events in neutron classes
+    bool neutron_A = false;
+    bool neutron_C = false;
+    int znClass = -1;
+
+    if(TMath::Abs(zdc.timeA)<2) neutron_A = true;
+    if(TMath::Abs(zdc.timeC)<2) neutron_C = true;
+
+    if(std::isinf(zdc.timeC))   neutron_C = false;
+    if(std::isinf(zdc.timeA))   neutron_A = false;
+
+    //fill the histos in neutron classes and assign neutron class label
+    //0n0n
+    if(neutron_C==false && neutron_A==false){
+      znClass = 0;
+      reg0n0n.fill(HIST("hMass"), p.M());
+      reg0n0n.fill(HIST("hPt"),  p.Pt());
+      reg0n0n.fill(HIST("hPtFit"),  p.Pt());
+      reg0n0n.fill(HIST("hEta"), p.Eta());
+      reg0n0n.fill(HIST("hRapidity"), p.Rapidity());
+    }
+    //Xn0n + 0nXn
+    else if(neutron_A ^ neutron_C){
+      if(neutron_A)      znClass = 1;
+      else if(neutron_C) znClass = 2;
+      regXn0n.fill(HIST("hMass"), p.M());
+      regXn0n.fill(HIST("hPt"),  p.Pt());
+      regXn0n.fill(HIST("hPtFit"),  p.Pt());
+      regXn0n.fill(HIST("hEta"), p.Eta());
+      regXn0n.fill(HIST("hRapidity"), p.Rapidity());
+    }
+    //XnXn
+    else if(neutron_A && neutron_C){
+      znClass = 3;
+      regXnXn.fill(HIST("hMass"), p.M());
+      regXnXn.fill(HIST("hPt"),  p.Pt());
+      regXnXn.fill(HIST("hPtFit"),  p.Pt());
+      regXnXn.fill(HIST("hEta"), p.Eta());
+      regXnXn.fill(HIST("hRapidity"), p.Rapidity());
+    }
+
+    //fill the histos without looking at neutron emission
     registry.fill(HIST("hContrib"), cand.numContrib());
     registry.fill(HIST("hPtTrkPos"), p1.Pt());
     registry.fill(HIST("hPtTrkNeg"), p2.Pt());
@@ -250,20 +364,27 @@ struct fwdMuonsUPC {
     registry.fill(HIST("hEvSign"),cand.netCharge());
     registry.fill(HIST("hMass"), p.M());
     registry.fill(HIST("hPt"),  p.Pt());
+    registry.fill(HIST("hPtFit"),  p.Pt());
     registry.fill(HIST("hEta"), p.Eta());
     registry.fill(HIST("hRapidity"), p.Rapidity());
     registry.fill(HIST("hPhi"), p.Phi());
     registry.fill(HIST("hCharge"),tr1.sign());
     registry.fill(HIST("hCharge"),tr2.sign());
 
-    //zdc info
-    registry.fill(HIST("hTimeZNA"), zdc.timeA);
-    registry.fill(HIST("hTimeZNC"), zdc.timeC);
+    
+    // store the event to save it into a tree
+    if(tr1.sign() > 0) {
+      dimuSel(p.M(),p.Pt(),p.Rapidity(),p.Phi(),
+	      p1.Pt(),p1.PseudoRapidity(),p1.Phi(),
+	      p2.Pt(),p2.PseudoRapidity(),p2.Phi(),
+	      zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);
+    } else {
+      dimuSel(p.M(),p.Pt(),p.Rapidity(),p.Phi(),
+	      p2.Pt(),p2.PseudoRapidity(),p2.Phi(),
+	      p1.Pt(),p1.PseudoRapidity(),p1.Phi(),
+	      zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);   
+    };
 
-    registry.fill(HIST("hEnergyZN"),zdc.enA,zdc.enC);
-
-    // restric the kine
-    if (p.M() > 2 && p.M() < 6 && p.Pt() < 5) mptSel(p.M(),p.Pt());
   }
 
 
@@ -283,16 +404,8 @@ struct fwdMuonsUPC {
 
     int match = 0;
     int tot = 0;
-    for (const auto& item : tracksPerCand) {
-      
-      int32_t candID = item.first;
-      match = match + zdcPerCand.count(candID);
-      tot++;
-      
-    }
-    //LOGP(info,"matches = {}",match);
-    //LOGP(info,"tot = {}",tot);
 
+    //loop over the candidates
     for (const auto& item : tracksPerCand) {
       int32_t trId1 = item.second[0];
       int32_t trId2 = item.second[1];
@@ -300,14 +413,27 @@ struct fwdMuonsUPC {
       auto cand = eventCandidates.iteratorAt(candID);
       auto tr1 = fwdTracks.iteratorAt(trId1);
       auto tr2 = fwdTracks.iteratorAt(trId2);
-      if(zdcPerCand.count(candID)==0) continue;
-      auto zdc = zdcPerCand.at(candID);
-      
+
+      // see number of events that have ZDC info
+      match = match + zdcPerCand.count(candID);
+      tot++;
+
+      ZDCinfo zdc;
+
+      if(zdcPerCand.count(candID)!=0) zdc = zdcPerCand.at(candID);
+      else{
+        zdc.timeA = -999;
+        zdc.timeC = -999;
+        zdc.enA   = -999;
+        zdc.enC   = -999;
+      }
+
       processCand(cand, tr1, tr2, zdc);
       
     }
 
-    
+    //LOGP(info,"my matches = {}",match);
+    //LOGP(info,"tot = {}",tot);
 
   }
 
@@ -316,5 +442,7 @@ struct fwdMuonsUPC {
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
-  return WorkflowSpec{adaptAnalysisTask<fwdMuonsUPC>(cfgc)};
+  return WorkflowSpec{
+    adaptAnalysisTask<fwdMuonsUPC>(cfgc),
+  };
 }
