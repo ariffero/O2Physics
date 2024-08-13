@@ -419,9 +419,13 @@ struct strangeness_tutorial {
   }
 
   template <typename T, typename V0s>
-  bool isSelectedV0Daughter(T const& track, float charge,
-                            double nsigmaV0Daughter, V0s const& /*candidate*/)
+  bool isSelectedV0Daughter(T const& track, float charge, double nsigmaV0Daughter, V0s const& /*candidate*/)
   {
+    //  if (QAv0_daughters) {
+    //     (charge == -1) ? rKzeroShort.fill(HIST("negative_pt"), track.pt()) : rKzeroShort.fill(HIST("positive_pt"), track.pt());
+    //     (charge == -1) ? rKzeroShort.fill(HIST("negative_eta"), track.eta()) : rKzeroShort.fill(HIST("positive_eta"), track.eta());
+    //     (charge == -1) ? rKzeroShort.fill(HIST("negative_phi"), track.phi()) : rKzeroShort.fill(HIST("positive_phi"), track.phi());
+    //   }
     if (QAPID) {
       // Filling the PID of the V0 daughters in the region of the K0 peak.
       // tpcInnerParam is the momentum at the inner wall of TPC. So momentum of tpc vs nsigma of tpc is plotted.
@@ -476,12 +480,6 @@ struct strangeness_tutorial {
     //   // }
     // }
 
-    if (QAv0_daughters) {
-      (charge == 1) ? rKzeroShort.fill(HIST("positive_pt"), track.pt()) : rKzeroShort.fill(HIST("negative_pt"), track.pt());
-      (charge == 1) ? rKzeroShort.fill(HIST("positive_eta"), track.eta()) : rKzeroShort.fill(HIST("negative_eta"), track.eta());
-      (charge == 1) ? rKzeroShort.fill(HIST("positive_phi"), track.phi()) : rKzeroShort.fill(HIST("negative_phi"), track.phi());
-    }
-
     return true;
   }
 
@@ -523,15 +521,15 @@ struct strangeness_tutorial {
     if (QAevents) {
       rEventSelection.fill(HIST("hVertexZRec"), collision.posZ());
       rEventSelection.fill(HIST("hmultiplicity"), multiplicity);
-      rEventSelection.fill(HIST("multdist_FT0M"), collision.centFT0M());
-      rEventSelection.fill(HIST("multdist_FT0A"), collision.centFT0A());
-      rEventSelection.fill(HIST("multdist_FT0C"), collision.centFT0C());
+      rEventSelection.fill(HIST("multdist_FT0M"), collision.multFT0M());
+      rEventSelection.fill(HIST("multdist_FT0A"), collision.multFT0A());
+      rEventSelection.fill(HIST("multdist_FT0C"), collision.multFT0C());
       rEventSelection.fill(HIST("hNcontributor"), collision.numContrib());
     }
 
     std::vector<int> v0indexes;
 
-    for (auto& [v1, v2] : combinations(CombinationsStrictlyUpperIndexPolicy(V0s, V0s))) {
+    for (auto& [v1, v2] : combinations(CombinationsUpperIndexPolicy(V0s, V0s))) {
 
       if (v1.size() == 0 || v2.size() == 0) {
         continue;
@@ -549,30 +547,32 @@ struct strangeness_tutorial {
       auto postrack2 = v2.template posTrack_as<TrackCandidates>();
       auto negtrack2 = v2.template negTrack_as<TrackCandidates>();
 
-      if (postrack1.globalIndex() == postrack2.globalIndex()) {
-        continue;
-      }
-      if (negtrack1.globalIndex() == negtrack2.globalIndex()) {
-        continue;
-      }
-
       double nTPCSigmaPos1{postrack1.tpcNSigmaPi()};
       double nTPCSigmaNeg1{negtrack1.tpcNSigmaPi()};
       double nTPCSigmaPos2{postrack2.tpcNSigmaPi()};
       double nTPCSigmaNeg2{negtrack2.tpcNSigmaPi()};
 
-      if (!isSelectedV0Daughter(postrack1, 1, nTPCSigmaPos1, v1)) {
+      if (!(isSelectedV0Daughter(negtrack1, -1, nTPCSigmaNeg1, v1) && isSelectedV0Daughter(postrack1, 1, nTPCSigmaPos1, v1))) {
         continue;
       }
-      if (!isSelectedV0Daughter(postrack2, 1, nTPCSigmaPos2, v2)) {
+      if (!(isSelectedV0Daughter(postrack2, 1, nTPCSigmaPos2, v2) && isSelectedV0Daughter(negtrack2, -1, nTPCSigmaNeg2, v2))) {
         continue;
       }
-      if (!isSelectedV0Daughter(negtrack1, -1, nTPCSigmaNeg1, v1)) {
-        continue;
+
+      if (QAv0_daughters) {
+        rKzeroShort.fill(HIST("negative_pt"), negtrack1.pt());
+        rKzeroShort.fill(HIST("positive_pt"), postrack1.pt());
+        rKzeroShort.fill(HIST("negative_eta"), negtrack1.eta());
+        rKzeroShort.fill(HIST("positive_eta"), postrack1.eta());
+        rKzeroShort.fill(HIST("negative_phi"), negtrack1.phi());
+        rKzeroShort.fill(HIST("positive_phi"), postrack1.phi());
       }
-      if (!isSelectedV0Daughter(negtrack2, -1, nTPCSigmaNeg2, v2)) {
-        continue;
-      }
+      // if (!isSelectedV0Daughter(negtrack1, -1, nTPCSigmaNeg1, v1)) {
+      //   continue;
+      // }
+      // if (!isSelectedV0Daughter(negtrack2, -1, nTPCSigmaNeg2, v2)) {
+      //   continue;
+      // }
 
       if (!(std::find(v0indexes.begin(), v0indexes.end(), v1.globalIndex()) != v0indexes.end())) {
         v0indexes.push_back(v1.globalIndex());
@@ -580,6 +580,17 @@ struct strangeness_tutorial {
       // std::cout << "global index of v1: " << v1.globalIndex() << "   global index of v2: " << v2.globalIndex() << std::endl;
       if (!(std::find(v0indexes.begin(), v0indexes.end(), v2.globalIndex()) != v0indexes.end())) {
         v0indexes.push_back(v2.globalIndex());
+      }
+
+      if (v1.globalIndex() == v2.globalIndex()) {
+        continue;
+      }
+
+      if (postrack1.globalIndex() == postrack2.globalIndex()) {
+        continue;
+      }
+      if (negtrack1.globalIndex() == negtrack2.globalIndex()) {
+        continue;
       }
 
       TLorentzVector lv1, lv2, lv3, lv4, lv5;
