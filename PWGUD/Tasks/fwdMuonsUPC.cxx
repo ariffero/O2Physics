@@ -20,6 +20,7 @@
 #include "TLorentzVector.h"
 #include "TSystem.h"
 #include "TMath.h"
+#include "TRandom3.h"
 
 namespace dimu
 {
@@ -28,6 +29,8 @@ DECLARE_SOA_COLUMN(M, m, float);
 DECLARE_SOA_COLUMN(Pt, pt, float);
 DECLARE_SOA_COLUMN(Rap, rap, float);
 DECLARE_SOA_COLUMN(Phi, phi, float);
+DECLARE_SOA_COLUMN(PhiAv, phiAv, float);
+DECLARE_SOA_COLUMN(PhiCh, phiCh, float);
 // tracks positive (p) and negative (n)
 DECLARE_SOA_COLUMN(Ptp, ptp, float);
 DECLARE_SOA_COLUMN(Etap, etap, float);
@@ -47,6 +50,7 @@ namespace o2::aod
 {
 DECLARE_SOA_TABLE(DiMu, "AOD", "DIMU",
                   dimu::M, dimu::Pt, dimu::Rap, dimu::Phi,
+                  dimu::PhiAv, dimu::PhiCh,
                   dimu::Ptp, dimu::Etap, dimu::Phip,
                   dimu::Ptn, dimu::Etan, dimu::Phin,
                   dimu::Tzna, dimu::Ezna, dimu::Tznc, dimu::Eznc, dimu::Nclass);
@@ -167,6 +171,8 @@ struct fwdMuonsUPC {
     registry.add("hTimeZNC", "ZNC Times;;#counts", kTH1D, {axisTimeZN});
     registry.add("hEnergyZN", "ZNA vs ZNC energy", kTH2D, {axisEnergyZNA, axisEnergyZNC});
     registry.add("hSameSign", "hSameSign;;#counts", kTH1D, {{6, -0.5, 5.5}});
+    registry.add("hPhiCharge", "#phi #it{charge}", kTH1D,{axisPhi});
+    registry.add("hPhiAverage", "#phi #it{average}", kTH1D,{axisPhi});
 
     reg0n0n.add("hMass", "Ivariant mass of muon pairs - 0n0n;;#counts", kTH1D, {axisMass});
     reg0n0n.add("hPt", "Transverse momentum mass of muon pairs - 0n0n;;#counts", kTH1D, {axisPt});
@@ -314,6 +320,24 @@ struct fwdMuonsUPC {
     if (p.Rapidity() > yCutUp)
       return;
 
+    //compute phi for azimuth anisotropy
+    TLorentzVector tSum, tDiffAv, tDiffCh;
+    tSum = p1 + p2;
+    if(tr1.sign()>0){
+      tDiffCh = p1 - p2;
+      if(gRandom->Rndm()>0.5)
+        tDiffAv = p1 - p2;
+      else tDiffAv = p2 - p1;
+    }else{
+      tDiffCh = p2 - p1;
+      if(gRandom->Rndm()>0.5)
+        tDiffAv = p2 - p1;
+      else tDiffAv = p1 - p2;
+    }
+    //average
+    float phiAverage = tSum.DeltaPhi(tDiffAv);
+    float phiCharge = tSum.DeltaPhi(tDiffCh);
+
     // zdc info
     if (TMath::Abs(zdc.timeA) < 10)
       registry.fill(HIST("hTimeZNA"), zdc.timeA);
@@ -381,15 +405,19 @@ struct fwdMuonsUPC {
     registry.fill(HIST("hPhi"), p.Phi());
     registry.fill(HIST("hCharge"), tr1.sign());
     registry.fill(HIST("hCharge"), tr2.sign());
+    registry.fill(HIST("hPhiAverage"), phiAverage);
+    registry.fill(HIST("hPhiCharge"), phiCharge);
 
     // store the event to save it into a tree
     if (tr1.sign() > 0) {
       dimuSel(p.M(), p.Pt(), p.Rapidity(), p.Phi(),
+              phiAverage, phiCharge,
               p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
               p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
               zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);
     } else {
       dimuSel(p.M(), p.Pt(), p.Rapidity(), p.Phi(),
+              phiAverage, phiCharge,
               p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
               p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
               zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);
