@@ -363,7 +363,7 @@ struct fwdMuonsUPC {
     // fill the histos in neutron classes and assign neutron class label
     // 0n0n
     if (neutron_C == false && neutron_A == false) {
-      znClass = 0;
+      znClass = 1;
       reg0n0n.fill(HIST("hMass"), p.M());
       reg0n0n.fill(HIST("hPt"), p.Pt());
       reg0n0n.fill(HIST("hPtFit"), p.Pt());
@@ -371,16 +371,16 @@ struct fwdMuonsUPC {
       reg0n0n.fill(HIST("hRapidity"), p.Rapidity());
     } else if (neutron_A ^ neutron_C) { // Xn0n + 0nXn
       if (neutron_A)
-        znClass = 1;
-      else if (neutron_C)
         znClass = 2;
+      else if (neutron_C)
+        znClass = 3;
       regXn0n.fill(HIST("hMass"), p.M());
       regXn0n.fill(HIST("hPt"), p.Pt());
       regXn0n.fill(HIST("hPtFit"), p.Pt());
       regXn0n.fill(HIST("hEta"), p.Eta());
       regXn0n.fill(HIST("hRapidity"), p.Rapidity());
     } else if (neutron_A && neutron_C) { // XnXn
-      znClass = 3;
+      znClass = 4;
       regXnXn.fill(HIST("hMass"), p.M());
       regXnXn.fill(HIST("hPt"), p.Pt());
       regXnXn.fill(HIST("hPtFit"), p.Pt());
