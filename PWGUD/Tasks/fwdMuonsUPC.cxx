@@ -304,8 +304,21 @@ struct fwdMuonsUPC {
     if (nMIDs != 2)
       return;
 
-    // cuts on pair kinematics
-    if (!(p.M() > 2 && p.M() < 6 && p.Pt() < 5))
+    //cut on pair kinematics
+    //select mass
+    if(p.M() < lowMass)
+      return;
+    if(p.M() > highMass)
+      return;
+    //select pt
+    if(p.Pt() < lowPt)
+      return;
+    if(p.Pt() > highPt)
+      return;
+    // select rapidity
+    if (p.Rapidity() < yCutLow)
+      return;
+    if (p.Rapidity() > yCutUp)
       return;
 
     // select opposite charge events only
@@ -313,12 +326,6 @@ struct fwdMuonsUPC {
       registry.fill(HIST("hSameSign"), cand.numContrib());
       return;
     }
-
-    // select rapidity ranges
-    if (p.Rapidity() < yCutLow)
-      return;
-    if (p.Rapidity() > yCutUp)
-      return;
 
     //compute phi for azimuth anisotropy
     TLorentzVector tSum, tDiffAv, tDiffCh;
