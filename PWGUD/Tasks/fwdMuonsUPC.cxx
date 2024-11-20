@@ -17,6 +17,7 @@
 #include "DataFormatsParameters/GRPECSObject.h"
 #include "PWGUD/DataModel/UDTables.h"
 
+#include "TDatabasePDG.h"
 #include "TLorentzVector.h"
 #include "TSystem.h"
 #include "TMath.h"
@@ -26,15 +27,27 @@ namespace dimu
 {
 // dimuon
 DECLARE_SOA_COLUMN(M, m, float);
+DECLARE_SOA_COLUMN(E, energy, float);
+DECLARE_SOA_COLUMN(Px, px, float);
+DECLARE_SOA_COLUMN(Py, py, float);
+DECLARE_SOA_COLUMN(Pz, pz, float);
 DECLARE_SOA_COLUMN(Pt, pt, float);
 DECLARE_SOA_COLUMN(Rap, rap, float);
 DECLARE_SOA_COLUMN(Phi, phi, float);
 DECLARE_SOA_COLUMN(PhiAv, phiAv, float);
 DECLARE_SOA_COLUMN(PhiCh, phiCh, float);
 // tracks positive (p) and negative (n)
+DECLARE_SOA_COLUMN(Ep, energyp, float);
+DECLARE_SOA_COLUMN(Pxp, pxp, float);
+DECLARE_SOA_COLUMN(Pyp, pyp, float);
+DECLARE_SOA_COLUMN(Pzp, pzp, float);
 DECLARE_SOA_COLUMN(Ptp, ptp, float);
 DECLARE_SOA_COLUMN(Etap, etap, float);
 DECLARE_SOA_COLUMN(Phip, phip, float);
+DECLARE_SOA_COLUMN(En, energyn, float);
+DECLARE_SOA_COLUMN(Pxn, pxn, float);
+DECLARE_SOA_COLUMN(Pyn, pyn, float);
+DECLARE_SOA_COLUMN(Pzn, pzn, float);
 DECLARE_SOA_COLUMN(Ptn, ptn, float);
 DECLARE_SOA_COLUMN(Etan, etan, float);
 DECLARE_SOA_COLUMN(Phin, phin, float);
@@ -49,10 +62,10 @@ DECLARE_SOA_COLUMN(Nclass, nclass, int);
 namespace o2::aod
 {
 DECLARE_SOA_TABLE(DiMu, "AOD", "DIMU",
-                  dimu::M, dimu::Pt, dimu::Rap, dimu::Phi,
+                  dimu::M, dimu::E, dimu::Px, dimu::Py, dimu::Pz, dimu::Pt, dimu::Rap, dimu::Phi,
                   dimu::PhiAv, dimu::PhiCh,
-                  dimu::Ptp, dimu::Etap, dimu::Phip,
-                  dimu::Ptn, dimu::Etan, dimu::Phin,
+                  dimu::Ep, dimu::Pxp, dimu::Pyp, dimu::Pzp, dimu::Ptp, dimu::Etap, dimu::Phip,
+                  dimu::En, dimu::Pxn, dimu::Pyn, dimu::Pzn, dimu::Ptn, dimu::Etan, dimu::Phin,
                   dimu::Tzna, dimu::Ezna, dimu::Tznc, dimu::Eznc, dimu::Nclass);
 }
 
@@ -62,6 +75,7 @@ using namespace o2::framework::expressions;
 
 // defining constants
 double mMu = 0.10566; // mass of muon
+
 
 // constants used in the track selection
 const float kRAbsMin = 17.6;
@@ -77,20 +91,27 @@ struct fwdMuonsUPC {
 
   using CandidatesFwd = soa::Join<o2::aod::UDCollisions, o2::aod::UDCollisionsSelsFwd>;
   using ForwardTracks = soa::Join<o2::aod::UDFwdTracks, o2::aod::UDFwdTracksExtra>;
+  using CompleteCandidatesFwd = soa::Join<CandidatesFwd, o2::aod::McTrackLabels>;
+  using CompleteFwdTracks = soa::Join<ForwardTracks, o2::aod::McTrackLabels>;
 
   Produces<o2::aod::DiMu> dimuSel;
 
-  // defining histograms using histogram registry
+  // defining histograms using histogram registry: different histos for the different process functions
   HistogramRegistry registry{"registry", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
   HistogramRegistry reg0n0n{"reg0n0n", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
   HistogramRegistry regXn0n{"regXn0n", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
   HistogramRegistry regXnXn{"regXnXn", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+  HistogramRegistry McGenRegistry{"McGenRegistry", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+  HistogramRegistry McCorrReg{"McCorrReg", {}, OutputObjHandlingPolicy::AnalysisObject, true, true};
+
+  
+  
 
   // CONFIGURABLES
   // pT of muon pairs
   Configurable<int> nBinsPt{"nBinsPt", 250, "N bins in pT histo"};
   Configurable<float> lowPt{"lowPt", 0., "lower limit in pT histo"};
-  Configurable<float> highPt{"highPt", 0.5, "upper limit in pT histo"};
+  Configurable<float> highPt{"highPt", 2, "upper limit in pT histo"};
   // mass of muon pairs
   Configurable<int> nBinsMass{"nBinsMass", 500, "N bins in mass histo"};
   Configurable<float> lowMass{"lowMass", 0., "lower limit in mass histo"};
@@ -125,10 +146,10 @@ struct fwdMuonsUPC {
   Configurable<float> highEnZN{"highEnZN", 250., "upper limit in ZN energy histo"};
 
   // configuarble rapidity cuts
-  Configurable<float> yCutLow{"yCutLow", -4, "Lower cut in pair rapidity"};
-  Configurable<float> yCutUp{"yCutUp", -2.5, "Upper cut in pair rapidity"};
+  //Configurable<float> yCutLow{"yCutLow", -4, "Lower cut in pair rapidity"};
+  //Configurable<float> yCutUp{"yCutUp", -2.5, "Upper cut in pair rapidity"};
 
-  void init(InitContext&)
+  void init(InitContext& context)
   {
     // binning of pT axis fr fit
     std::vector<double> ptFitBinning = {
@@ -152,9 +173,10 @@ struct fwdMuonsUPC {
     const AxisSpec axisPhiSingle{nBinsPhiSingle, lowPhiSingle, highPhiSingle, "#varphi_{trk}"};
 
     // histos
+    // data and reco MC
     registry.add("hMass", "Ivariant mass of muon pairs;;#counts", kTH1D, {axisMass});
-    registry.add("hPt", "Transverse momentum mass of muon pairs;;#counts", kTH1D, {axisPt});
-    registry.add("hPtFit", "Transverse momentum mass of muon pairs;;#counts", kTH1D, {axisPtFit});
+    registry.add("hPt", "Transverse momentum of muon pairs;;#counts", kTH1D, {axisPt});
+    registry.add("hPtFit", "Transverse momentum of muon pairs;;#counts", kTH1D, {axisPtFit});
     registry.add("hEta", "Pseudorapidty of muon pairs;;#counts", kTH1D, {axisEta});
     registry.add("hRapidity", "Rapidty of muon pairs;;#counts", kTH1D, {axisRapidity});
     registry.add("hPhi", "#varphi of muon pairs;;#counts", kTH1D, {axisPhi});
@@ -167,30 +189,50 @@ struct fwdMuonsUPC {
     registry.add("hEtaTrkNeg", "#eta of negative muons;;#counts", kTH1D, {axisEtaSingle});
     registry.add("hPhiTrkPos", "#varphi of positive muons;;#counts", kTH1D, {axisPhiSingle});
     registry.add("hPhiTrkNeg", "#varphi of negative muons;;#counts", kTH1D, {axisPhiSingle});
-    registry.add("hTimeZNA", "ZNA Times;;#counts", kTH1D, {axisTimeZN});
-    registry.add("hTimeZNC", "ZNC Times;;#counts", kTH1D, {axisTimeZN});
-    registry.add("hEnergyZN", "ZNA vs ZNC energy", kTH2D, {axisEnergyZNA, axisEnergyZNC});
     registry.add("hSameSign", "hSameSign;;#counts", kTH1D, {{6, -0.5, 5.5}});
     registry.add("hPhiCharge", "#phi #it{charge}", kTH1D,{axisPhi});
     registry.add("hPhiAverage", "#phi #it{average}", kTH1D,{axisPhi});
 
+    // data
+    registry.add("hTimeZNA", "ZNA Times;;#counts", kTH1D, {axisTimeZN});
+    registry.add("hTimeZNC", "ZNC Times;;#counts", kTH1D, {axisTimeZN});
+    registry.add("hEnergyZN", "ZNA vs ZNC energy", kTH2D, {axisEnergyZNA, axisEnergyZNC});
+
     reg0n0n.add("hMass", "Ivariant mass of muon pairs - 0n0n;;#counts", kTH1D, {axisMass});
-    reg0n0n.add("hPt", "Transverse momentum mass of muon pairs - 0n0n;;#counts", kTH1D, {axisPt});
+    reg0n0n.add("hPt", "Transverse momentum of muon pairs - 0n0n;;#counts", kTH1D, {axisPt});
     reg0n0n.add("hEta", "Pseudorapidty of muon pairs - 0n0n;;#counts", kTH1D, {axisEta});
     reg0n0n.add("hRapidity", "Rapidty of muon pairs - 0n0n;;#counts", kTH1D, {axisRapidity});
-    reg0n0n.add("hPtFit", "Transverse momentum mass of muon pairs - 0n0n;;#counts", kTH1D, {axisPtFit});
+    reg0n0n.add("hPtFit", "Transverse momentum of muon pairs - 0n0n;;#counts", kTH1D, {axisPtFit});
 
     regXn0n.add("hMass", "Ivariant mass of muon pairs - Xn0n;;#counts", kTH1D, {axisMass});
-    regXn0n.add("hPt", "Transverse momentum mass of muon pairs - Xn0n;;#counts", kTH1D, {axisPt});
+    regXn0n.add("hPt", "Transverse momentum of muon pairs - Xn0n;;#counts", kTH1D, {axisPt});
     regXn0n.add("hEta", "Pseudorapidty of muon pairs - Xn0n;;#counts", kTH1D, {axisEta});
     regXn0n.add("hRapidity", "Rapidty of muon pairs - Xn0n;;#counts", kTH1D, {axisRapidity});
-    regXn0n.add("hPtFit", "Transverse momentum mass of muon pairs - Xn0n;;#counts", kTH1D, {axisPtFit});
+    regXn0n.add("hPtFit", "Transverse momentum of muon pairs - Xn0n;;#counts", kTH1D, {axisPtFit});
 
     regXnXn.add("hMass", "Ivariant mass of muon pairs - XnXn;;#counts", kTH1D, {axisMass});
-    regXnXn.add("hPt", "Transverse momentum mass of muon pairs - XnXn;;#counts", kTH1D, {axisPt});
+    regXnXn.add("hPt", "Transverse momentum of muon pairs - XnXn;;#counts", kTH1D, {axisPt});
     regXnXn.add("hEta", "Pseudorapidty of muon pairs - XnXn;;#counts", kTH1D, {axisEta});
     regXnXn.add("hRapidity", "Rapidty of muon pairs - XnXn;;#counts", kTH1D, {axisRapidity});
-    regXnXn.add("hPtFit", "Transverse momentum mass of muon pairs - XnXn;;#counts", kTH1D, {axisPtFit});
+    regXnXn.add("hPtFit", "Transverse momentum of muon pairs - XnXn;;#counts", kTH1D, {axisPtFit});
+
+    // gen MC
+    McGenRegistry.add("hMass", "Ivariant mass of muon pairs;;#counts", kTH1D, {axisMass});
+    McGenRegistry.add("hPt", "Transverse momentum of muon pairs;;#counts", kTH1D, {axisPt});
+    McGenRegistry.add("hEta", "Pseudorapidty of muon pairs;;#counts", kTH1D, {axisEta});
+    McGenRegistry.add("hRapidity", "Rapidty of muon pairs;;#counts", kTH1D, {axisRapidity});
+    McGenRegistry.add("hPhi", "#varphi of muon pairs;;#counts", kTH1D, {axisPhi});
+    McGenRegistry.add("hPtTrkPos", "Pt of positive muons;;#counts", kTH1D, {axisPtSingle});
+    McGenRegistry.add("hPtTrkNeg", "Pt of negative muons;;#counts", kTH1D, {axisPtSingle});
+    McGenRegistry.add("hEtaTrkPos", "#eta of positive muons;;#counts", kTH1D, {axisEtaSingle});
+    McGenRegistry.add("hEtaTrkNeg", "#eta of negative muons;;#counts", kTH1D, {axisEtaSingle});
+    McGenRegistry.add("hPhiTrkPos", "#varphi of positive muons;;#counts", kTH1D, {axisPhiSingle});
+    McGenRegistry.add("hPhiTrkNeg", "#varphi of negative muons;;#counts", kTH1D, {axisPhiSingle});
+    McGenRegistry.add("hPhiCharge", "#phi #it{charge}", kTH1D,{axisPhi});
+    McGenRegistry.add("hPhiAverage", "#phi #it{average}", kTH1D,{axisPhi});
+
+    //corr gen-reco
+    McCorrReg.add("hPtcorr", "gen pT vs reco pT", kTH2D, {axisPt, axisPt});
   }
 
   // FUNCTIONS
@@ -207,6 +249,38 @@ struct fwdMuonsUPC {
         continue;
       }
       tracksPerCand[candId].push_back(tr.globalIndex());
+    }
+  }
+
+  // template function that fills a map with the collision id of each udmccollision as key
+  // and a vector with the tracks
+  // map == (key, element) == (udMcCollisionId, vector of mc particles)
+  template <typename TTracks>
+  void collectMcCandIDs(std::unordered_map<int32_t, std::vector<int32_t>>& tracksPerCand, TTracks& tracks)
+  {
+    for (const auto& tr : tracks) {
+      int32_t candId = tr.udMcCollisionId();
+      if (candId < 0) {
+        continue;
+      }
+      tracksPerCand[candId].push_back(tr.globalIndex());
+    }
+  }
+
+  template <typename TTracks>
+  void collectMcGenRecoCandIDs(std::unordered_map<int32_t, std::vector<int32_t>>& tracksPerCand, TTracks& tracks)
+  {
+    for (const auto& tr : tracks) {
+      if(tr.has_mcParticle()){
+        int32_t candId = tr.udCollisionId();
+        if (candId < 0) {
+          continue;
+        }
+        tracksPerCand[candId].push_back(tr.globalIndex());
+        
+        auto mcPart = tr.mcParticle();
+        tracksPerCand[candId].push_back(mcPart.globalIndex());
+      }
     }
   }
 
@@ -269,6 +343,30 @@ struct fwdMuonsUPC {
     return true;
   }
 
+  //compute phi for azimuth anisotropy
+  void computePhiAnis(TLorentzVector p1, TLorentzVector p2, int sign1, float &phiAverage, float &phiCharge){
+    
+    TLorentzVector tSum, tDiffAv, tDiffCh;
+    tSum = p1 + p2;
+    if(sign1>0){
+      tDiffCh = p1 - p2;
+      if(gRandom->Rndm()>0.5)
+        tDiffAv = p1 - p2;
+      else tDiffAv = p2 - p1;
+    }else{
+      tDiffCh = p2 - p1;
+      if(gRandom->Rndm()>0.5)
+        tDiffAv = p2 - p1;
+      else tDiffAv = p1 - p2;
+    }
+
+    //average
+    phiAverage = tSum.DeltaPhi(tDiffAv);
+    //charge
+    phiCharge = tSum.DeltaPhi(tDiffCh);
+  }
+    
+
   // function that processes the candidates:
   // it applies V0 selection, trk selection, and fills the histograms
   void processCand(CandidatesFwd::iterator const& cand,
@@ -295,6 +393,12 @@ struct fwdMuonsUPC {
     if (!isMuonSelected(tr2))
       return;
 
+    //select MCH-MID tracks only
+    //if(tr1.trackType() != 3) 
+    //  return;
+    //if(tr2.trackType() != 3) 
+    //  return;
+
     // MCH-MID match selection
     int nMIDs = 0;
     if (tr1.chi2MatchMCHMID() > 0)
@@ -316,9 +420,9 @@ struct fwdMuonsUPC {
     if(p.Pt() > highPt)
       return;
     // select rapidity
-    if (p.Rapidity() < yCutLow)
+    if (p.Rapidity() < lowRapidity)
       return;
-    if (p.Rapidity() > yCutUp)
+    if (p.Rapidity() > highRapidity)
       return;
 
     // select opposite charge events only
@@ -377,9 +481,11 @@ struct fwdMuonsUPC {
       reg0n0n.fill(HIST("hEta"), p.Eta());
       reg0n0n.fill(HIST("hRapidity"), p.Rapidity());
     } else if (neutron_A ^ neutron_C) { // Xn0n + 0nXn
-      if (neutron_A)
-        znClass = 2;
-      else if (neutron_C)
+      if (neutron_A)// select opposite charge events only
+    if (cand.netCharge() != 0) {
+      registry.fill(HIST("hSameSign"), cand.numContrib());
+      return;
+    }
         znClass = 3;
       regXn0n.fill(HIST("hMass"), p.M());
       regXn0n.fill(HIST("hPt"), p.Pt());
@@ -417,22 +523,144 @@ struct fwdMuonsUPC {
 
     // store the event to save it into a tree
     if (tr1.sign() > 0) {
-      dimuSel(p.M(), p.Pt(), p.Rapidity(), p.Phi(),
+      dimuSel(p.M(), p.E(), p.Px(), p.Py(), p.Pz(), p.Pt(), p.Rapidity(), p.Phi(),
               phiAverage, phiCharge,
-              p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
-              p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
-              zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);
+              p1.E(), p1.Px(), p1.Py(), p1.Pz(), p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
+              p2.E(), p2.Px(), p2.Py(), p2.Pz(), p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
+              zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);TLorentzVector p1, p2;
+    p1.SetXYZM(tr1.px(), tr1.py(), tr1.pz(), mMu);
+    p2.SetXYZM(tr2.px(), tr2.py(), tr2.pz(), mMu);
+    TLorentzVector p = p1 + p2;
     } else {
-      dimuSel(p.M(), p.Pt(), p.Rapidity(), p.Phi(),
+      dimuSel(p.M(), p.E(), p.Px(), p.Py(), p.Pz(), p.Pt(), p.Rapidity(), p.Phi(),
               phiAverage, phiCharge,
-              p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
-              p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
+              p2.E(), p2.Px(), p2.Py(), p2.Pz(), p2.Pt(), p2.PseudoRapidity(), p2.Phi(),
+              p1.E(), p1.Px(), p1.Py(), p1.Pz(), p1.Pt(), p1.PseudoRapidity(), p1.Phi(),
               zdc.timeA, zdc.enA, zdc.timeC, zdc.enC, znClass);
     }
+    
+  }
+
+  // function that processes the MC gen candidates:
+  // it applies some kinematics cut and fills the histograms
+  void processMcCand(aod::UDMcCollisions::iterator const& mcCand,
+                     aod::UDMcParticles::iterator const& McPart1, aod::UDMcParticles::iterator const& McPart2){
+
+    //check that all pairs are mu+mu-
+    if(McPart1.pdgCode() + McPart2.pdgCode() != 0) LOGF(info,"PDG codes: %d | %d" ,McPart1.pdgCode(),McPart2.pdgCode());
+    
+    // create Lorentz vectors
+    TLorentzVector p1, p2;
+    p1.SetXYZM(McPart1.px(), McPart1.py(), McPart1.pz(), mMu);
+    p2.SetXYZM(McPart2.px(), McPart2.py(), McPart2.pz(), mMu);
+    TLorentzVector p = p1 + p2;
+
+    //cut on pair kinematics
+    //select mass
+    if(p.M() < lowMass)
+      return;
+    if(p.M() > highMass)
+      return;
+    //select pt
+    if(p.Pt() < lowPt)
+      return;
+    if(p.Pt() > highPt)
+      return;
+    // select rapidity
+    if (p.Rapidity() < lowRapidity)
+      return;
+    if (p.Rapidity() > highRapidity)
+      return;
+
+    //compute phi for azimuth anisotropy
+    float phiAverage = 0;
+    float phiCharge = 0;
+    computePhiAnis(p1,p2,McPart1.pdgCode(),phiAverage, phiCharge);    
+
+    // fill the histos
+    McGenRegistry.fill(HIST("hPtTrkPos"), p1.Pt());
+    McGenRegistry.fill(HIST("hPtTrkNeg"), p2.Pt());
+    McGenRegistry.fill(HIST("hEtaTrkPos"), p1.Eta());
+    McGenRegistry.fill(HIST("hEtaTrkNeg"), p2.Eta());
+    McGenRegistry.fill(HIST("hPhiTrkPos"), p1.Phi());
+    McGenRegistry.fill(HIST("hPhiTrkNeg"), p2.Phi());
+    McGenRegistry.fill(HIST("hMass"), p.M());
+    McGenRegistry.fill(HIST("hPt"), p.Pt());
+    McGenRegistry.fill(HIST("hEta"), p.Eta());
+    McGenRegistry.fill(HIST("hRapidity"), p.Rapidity());
+    McGenRegistry.fill(HIST("hPhi"), p.Phi());
+    McGenRegistry.fill(HIST("hPhiAverage"), phiAverage);
+    McGenRegistry.fill(HIST("hPhiCharge"), phiCharge);
+
+  }
+
+  void processMcCandGenReco(CandidatesFwd::iterator const& cand,
+                            const ForwardTracks::iterator& tr1, const ForwardTracks::iterator& tr2,
+                            aod::UDMcParticles::iterator const& McPart1, aod::UDMcParticles::iterator const& McPart2)
+  {
+    // V0 selection
+    const auto& ampsV0A = cand.amplitudesV0A();
+    const auto& ampsRelBCsV0A = cand.ampRelBCsV0A();
+    for (unsigned int i = 0; i < ampsV0A.size(); ++i) {
+      if (std::abs(ampsRelBCsV0A[i]) <= 1) {
+        if (ampsV0A[i] > 100.)
+          return;
+      }
+    }
+
+    // track selection
+    TLorentzVector p1, p2;
+    p1.SetXYZM(tr1.px(), tr1.py(), tr1.pz(), mMu);
+    p2.SetXYZM(tr2.px(), tr2.py(), tr2.pz(), mMu);
+    TLorentzVector p = p1 + p2;
+    if (!isMuonSelected(tr1))
+      return;
+    if (!isMuonSelected(tr2))
+      return;
+
+    // MCH-MID match selection
+    int nMIDs = 0;
+    if (tr1.chi2MatchMCHMID() > 0)
+      nMIDs++;
+    if (tr2.chi2MatchMCHMID() > 0)
+      nMIDs++;
+    if (nMIDs != 2)
+      return;
+
+    // select opposite charge events only
+    if (cand.netCharge() != 0) {
+      registry.fill(HIST("hSameSign"), cand.numContrib());
+      return;
+    }
+
+    // mc particle
+    TLorentzVector p1Mc, p2Mc;
+    p1Mc.SetXYZM(McPart1.px(), McPart1.py(), McPart1.pz(), mMu);
+    p2Mc.SetXYZM(McPart2.px(), McPart2.py(), McPart2.pz(), mMu);
+    TLorentzVector pMc = p1Mc + p2Mc;
+
+    //cut on pair kinematics
+    //select mass
+    if(p.M() < lowMass)
+      return;
+    if(p.M() > highMass)
+      return;
+    //select pt
+    if(p.Pt() < lowPt)
+      return;
+    if(p.Pt() > highPt)
+      return;
+    // select rapidity
+    if (p.Rapidity() < lowRapidity)
+      return;
+    if (p.Rapidity() > highRapidity)
+      return;
+
+    McCorrReg.fill(HIST("hPtcorr"), p.Pt(),pMc.Pt());
   }
 
   // PROCESS FUNCTION
-  void process(CandidatesFwd const& eventCandidates,
+  void processDataAndReco(CandidatesFwd const& eventCandidates,
                o2::aod::UDZdcsReduced& ZDCs,
                ForwardTracks const& fwdTracks)
   {
@@ -469,7 +697,59 @@ struct fwdMuonsUPC {
     }
   }
 
-  PROCESS_SWITCH(fwdMuonsUPC, process, "", false);
+  PROCESS_SWITCH(fwdMuonsUPC, processDataAndReco, "", true);
+
+
+  // process MC Truth
+  void processGen(aod::UDMcCollisions const& mccollisions, aod::UDMcParticles const& McParts){
+    
+    // map with the tracks
+    std::unordered_map<int32_t, std::vector<int32_t>> tracksPerCand;
+    collectMcCandIDs(tracksPerCand, McParts);
+
+    // loop over the candidates
+    for (const auto& item : tracksPerCand) {
+      int32_t trId1 = item.second[0];
+      int32_t trId2 = item.second[1];
+      int32_t candID = item.first;
+      auto cand = mccollisions.iteratorAt(candID);
+      auto tr1 = McParts.iteratorAt(trId1);
+      auto tr2 = McParts.iteratorAt(trId2);
+
+      processMcCand(cand, tr1, tr2);
+    }
+  }
+  PROCESS_SWITCH(fwdMuonsUPC, processGen, "", false);
+
+/*
+  void processGenAndReco(CandidatesFwd const& eventCandidates,
+                       ForwardTracks const& fwdTracks,
+                       aod::UDMcParticles const&)
+  {
+    // map with the tracks
+    std::unordered_map<int32_t, std::vector<int32_t>> tracksPerCand;
+    collectMcGenRecoCandIDs(tracksPerCand, fwdTracks);
+
+    // loop over the candidates
+      for (const auto& item : tracksPerCand) {
+        int32_t trId1 = item.second[0];
+        int32_t trId2 = item.second[1];
+
+        int32_t candID = item.first;
+        auto cand = eventCandidates.iteratorAt(candID);
+        auto tr1 = fwdTracks.iteratorAt(trId1);
+        auto tr2 = fwdTracks.iteratorAt(trId2);
+
+        int32_t trMcId1 = item.second[2];
+        int32_t trMcId2 = item.second[3];
+        auto trMc1 = fwdTracks.iteratorAt(trMcId1);
+        auto trMc2 = fwdTracks.iteratorAt(trMcId2);
+
+        processMcCandGenReco(cand, tr1, tr2, trMc1, trMc2);
+      }
+  }
+  PROCESS_SWITCH(fwdMuonsUPC, processGenAndReco, "", false);
+*/
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)

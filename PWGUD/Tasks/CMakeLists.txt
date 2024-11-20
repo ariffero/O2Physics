@@ -212,3 +212,13 @@ o2physics_add_dpl_workflow(event-by-event
                            SOURCES eventByevent.cxx
                            PUBLIC_LINK_LIBRARIES O2::Framework O2Physics::AnalysisCore O2Physics::DGPIDSelector
                            COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(mumu-forward
+                           SOURCES mumuForward.cxx
+                           PUBLIC_LINK_LIBRARIES O2::Framework O2Physics::AnalysisCore O2Physics::DGPIDSelector
+                           COMPONENT_NAME Analysis)
+                           
+o2physics_add_dpl_workflow(fwd-muons-mc
+                           SOURCES fwdMuonsMC.cxx
+                           PUBLIC_LINK_LIBRARIES O2::Framework O2Physics::AnalysisCore O2Physics::DGPIDSelector
+                           COMPONENT_NAME Analysis)
