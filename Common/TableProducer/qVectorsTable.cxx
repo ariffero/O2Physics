@@ -82,6 +82,7 @@ struct qVectorsTable {
   Configurable<std::vector<int>> cfgnMods{"cfgnMods", {2, 3}, "Modulation of interest"};
   Configurable<float> cfgMaxCentrality{"cfgMaxCentrality", 100.f, "max. centrality for Q vector calibration"};
 
+  Configurable<bool> useCorrectionForRun{"useCorrectionForRun", true, "Get Qvector corrections based on run number instead of timestamp"};
   Configurable<std::string> cfgGainEqPath{"cfgGainEqPath", "Users/j/junlee/Qvector/GainEq", "CCDB path for gain equalization constants"};
   Configurable<std::string> cfgQvecCalibPath{"cfgQvecCalibPath", "Analysis/EventPlane/QVecCorrections", "CCDB pasth for Q-vecteor calibration constants"};
 
@@ -149,9 +150,12 @@ struct qVectorsTable {
   /////////////////////////////////////////////////////////////////
 
   std::unordered_map<string, bool> useDetector = {
-    {"QvectorTPCalls", cfgUseTPCall || cfgUseBTot},
-    {"QvectorTPCnegs", cfgUseTPCneg || cfgUseBNeg},
-    {"QvectorTPCposs", cfgUseTPCpos || cfgUseBPos},
+    {"QvectorBTots", cfgUseBTot},
+    {"QvectorBNegs", cfgUseBNeg},
+    {"QvectorBPoss", cfgUseBPos},
+    {"QvectorTPCalls", cfgUseTPCall},
+    {"QvectorTPCnegs", cfgUseTPCneg},
+    {"QvectorTPCposs", cfgUseTPCpos},
     {"QvectorFV0As", cfgUseFV0A},
     {"QvectorFT0Ms", cfgUseFT0M},
     {"QvectorFT0As", cfgUseFT0A},
@@ -216,9 +220,10 @@ struct qVectorsTable {
     std::string fullPath;
 
     auto timestamp = bc.timestamp();
+    auto runnumber = bc.runNumber();
 
-    auto offsetFT0 = ccdb->getForTimeStamp<std::vector<o2::detectors::AlignParam>>("FT0/Calib/Align", timestamp);
-    auto offsetFV0 = ccdb->getForTimeStamp<std::vector<o2::detectors::AlignParam>>("FV0/Calib/Align", timestamp);
+    auto offsetFT0 = getForTsOrRun<std::vector<o2::detectors::AlignParam>>("FT0/Calib/Align", timestamp, runnumber);
+    auto offsetFV0 = getForTsOrRun<std::vector<o2::detectors::AlignParam>>("FV0/Calib/Align", timestamp, runnumber);
 
     if (offsetFT0 != nullptr) {
       helperEP.SetOffsetFT0A((*offsetFT0)[0].getX(), (*offsetFT0)[0].getY());
@@ -240,17 +245,17 @@ struct qVectorsTable {
       fullPath = cfgQvecCalibPath;
       fullPath += "/v";
       fullPath += std::to_string(ind);
-      auto objqvec = ccdb->getForTimeStamp<TH3F>(fullPath, timestamp);
+      auto objqvec = getForTsOrRun<TH3F>(fullPath, timestamp, runnumber);
       if (!objqvec) {
         fullPath = cfgQvecCalibPath;
         fullPath += "/v2";
-        objqvec = ccdb->getForTimeStamp<TH3F>(fullPath, timestamp);
+        objqvec = getForTsOrRun<TH3F>(fullPath, timestamp, runnumber);
       }
       objQvec.push_back(objqvec);
     }
     fullPath = cfgGainEqPath;
     fullPath += "/FT0";
-    auto objft0Gain = ccdb->getForTimeStamp<std::vector<float>>(fullPath, timestamp);
+    auto objft0Gain = getForTsOrRun<std::vector<float>>(fullPath, timestamp, runnumber);
     if (!objft0Gain || cfgCorrLevel == 0) {
       for (auto i{0u}; i < 208; i++) {
         FT0RelGainConst.push_back(1.);
@@ -261,7 +266,7 @@ struct qVectorsTable {
 
     fullPath = cfgGainEqPath;
     fullPath += "/FV0";
-    auto objfv0Gain = ccdb->getForTimeStamp<std::vector<float>>(fullPath, timestamp);
+    auto objfv0Gain = getForTsOrRun<std::vector<float>>(fullPath, timestamp, runnumber);
     if (!objfv0Gain || cfgCorrLevel == 0) {
       for (auto i{0u}; i < 48; i++) {
         FV0RelGainConst.push_back(1.);
@@ -294,6 +299,21 @@ struct qVectorsTable {
       return false;
 
     return true;
+  }
+
+  /// Function to get corrections from CCDB eithr using the timestamp or the runnumber
+  /// \param fullPath is the path to correction in CCDB
+  /// \param timestamp is the collision timestamp
+  /// \param runNumber is the collision run number
+  /// \return CCDB correction
+  template <typename CorrectionType>
+  CorrectionType* getForTsOrRun(std::string const& fullPath, int64_t timestamp, int runNumber)
+  {
+    if (useCorrectionForRun) {
+      return ccdb->getForRun<CorrectionType>(fullPath, runNumber);
+    } else {
+      return ccdb->getForTimeStamp<CorrectionType>(fullPath, timestamp);
+    }
   }
 
   template <typename Nmode, typename CollType, typename TrackType>
@@ -427,12 +447,12 @@ struct qVectorsTable {
       if (std::abs(trk.eta()) < 0.1) {
         continue;
       }
-      if (trk.eta() > 0 && useDetector["QvectorTPCposs"]) {
+      if (trk.eta() > 0 && (useDetector["QvectorTPCposs"] || useDetector["QvectorBPoss"])) {
         qVectTPCpos[0] += trk.pt() * std::cos(trk.phi() * nmode);
         qVectTPCpos[1] += trk.pt() * std::sin(trk.phi() * nmode);
         TrkTPCposLabel.push_back(trk.globalIndex());
         nTrkTPCpos++;
-      } else if (trk.eta() < 0 && useDetector["QvectorTPCnegs"]) {
+      } else if (trk.eta() < 0 && (useDetector["QvectorTPCnegs"] || useDetector["QvectorBNegs"])) {
         qVectTPCneg[0] += trk.pt() * std::cos(trk.phi() * nmode);
         qVectTPCneg[1] += trk.pt() * std::sin(trk.phi() * nmode);
         TrkTPCnegLabel.push_back(trk.globalIndex());
@@ -605,11 +625,11 @@ struct qVectorsTable {
     qVectorTPCallVec(IsCalibrated, qvecReTPCall, qvecImTPCall, qvecAmp[kTPCall], TrkTPCallLabel);
 
     // Deprecated, will be removed in future after transition time //
-    if (useDetector["QvectorTPCposs"])
+    if (useDetector["QvectorBPoss"])
       qVectorBPos(IsCalibrated, qvecReTPCpos.at(0), qvecImTPCpos.at(0), qvecAmp[kTPCpos], TrkTPCposLabel);
-    if (useDetector["QvectorTPCnegs"])
+    if (useDetector["QvectorBNegs"])
       qVectorBNeg(IsCalibrated, qvecReTPCneg.at(0), qvecImTPCneg.at(0), qvecAmp[kTPCneg], TrkTPCnegLabel);
-    if (useDetector["QvectorTPCalls"])
+    if (useDetector["QvectorBTots"])
       qVectorBTot(IsCalibrated, qvecReTPCall.at(0), qvecImTPCall.at(0), qvecAmp[kTPCall], TrkTPCallLabel);
 
     qVectorBPosVec(IsCalibrated, qvecReTPCpos, qvecImTPCpos, qvecAmp[kTPCpos], TrkTPCposLabel);

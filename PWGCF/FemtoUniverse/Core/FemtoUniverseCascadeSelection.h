@@ -16,6 +16,7 @@
 /// \author Luca Barioglio, TU München, luca.barioglio@cern.ch
 /// \author Zuzanna Chochulska, WUT Warsaw & CTU Prague, zchochul@cern.ch
 /// \author Barbara Chytla, WUT Warsaw, barbara.chytla@cern.ch
+/// \author Shirajum Monira, WUT Warsaw, shirajum.monira@cern.ch
 
 #ifndef PWGCF_FEMTOUNIVERSE_CORE_FEMTOUNIVERSECASCADESELECTION_H_
 #define PWGCF_FEMTOUNIVERSE_CORE_FEMTOUNIVERSECASCADESELECTION_H_
@@ -87,13 +88,13 @@ class FemtoUniverseCascadeSelection
 
  public:
   FemtoUniverseCascadeSelection()
-    : nPtCascadeMinSel(0), nPtCascadeMaxSel(0), nEtaCascadeMaxSel(0), nDCAV0DaughMax(0), nCPAV0Min(0), nTranRadV0Min(0), nTranRadV0Max(0), nV0DecVtxMax(0), nDCACascadeDaughMax(0), nCPACascadeMin(0), nTranRadCascadeMin(0), nTranRadCascadeMax(0), nDecVtxMax(0), nDCAPosToPV(0), nDCANegToPV(0), nDCABachToPV(0), nDCAV0ToPV(0), pTCascadeMin(9999999.), pTCascadeMax(-9999999.), etaCascadeMax(-9999999.), DCAV0DaughMax(-9999999.), CPAV0Min(9999999.), TranRadV0Min(9999999.), TranRadV0Max(-9999999.), V0DecVtxMax(-9999999.), DCACascadeDaughMax(-9999999.), CPACascadeMin(9999999.), TranRadCascadeMin(9999999.), TranRadCascadeMax(-9999999.), DecVtxMax(-9999999.), DCAPosToPV(9999999.), DCANegToPV(9999999.), DCABachToPV(9999999.), DCAV0ToPV(9999999.), fV0InvMassLowLimit(1.05), fV0InvMassUpLimit(1.3), fInvMassLowLimit(1.25), fInvMassUpLimit(1.4), fRejectOmega(false), fInvMassOmegaLowLimit(1.5), fInvMassOmegaUpLimit(2.0) /*, nSigmaPIDOffsetTPC(0.)*/
+    : nPtCascadeMinSel(0), nPtCascadeMaxSel(0), nEtaCascadeMaxSel(0), nDCAV0DaughMax(0), nCPAV0Min(0), nTranRadV0Min(0), nTranRadV0Max(0), nV0DecVtxMax(0), nDCACascadeDaughMax(0), nCPACascadeMin(0), nTranRadCascadeMin(0), nTranRadCascadeMax(0), nDecVtxMax(0), nDCAPosToPV(0), nDCANegToPV(0), nDCABachToPV(0), nDCAV0ToPV(0), pTCascadeMin(9999999.), pTCascadeMax(-9999999.), etaCascadeMax(-9999999.), DCAV0DaughMax(-9999999.), CPAV0Min(9999999.), TranRadV0Min(9999999.), TranRadV0Max(-9999999.), V0DecVtxMax(-9999999.), DCACascadeDaughMax(-9999999.), CPACascadeMin(9999999.), TranRadCascadeMin(9999999.), TranRadCascadeMax(-9999999.), DecVtxMax(-9999999.), DCAPosToPV(9999999.), DCANegToPV(9999999.), DCABachToPV(9999999.), DCAV0ToPV(9999999.), fV0InvMassLowLimit(1.05), fV0InvMassUpLimit(1.3), fInvMassLowLimit(1.25), fInvMassUpLimit(1.4), fRejectCompetingMass(false), fInvMassCompetingLowLimit(1.5), fInvMassCompetingUpLimit(2.0), isCascOmega(false) /*, nSigmaPIDOffsetTPC(0.)*/
   {
   }
 
   /// Initializes histograms for the task
   template <o2::aod::femtouniverseparticle::ParticleType part, o2::aod::femtouniverseparticle::ParticleType daugh, o2::aod::femtouniverseparticle::ParticleType bach, typename cutContainerType>
-  void init(HistogramRegistry* registry);
+  void init(HistogramRegistry* registry, bool isSelectCascOmega = false);
 
   template <typename Col, typename Casc, typename Track>
   bool isSelectedMinimal(Col const& col, Casc const& cascade, Track const& posTrack, Track const& negTrack, Track const& bachTrack);
@@ -168,11 +169,11 @@ class FemtoUniverseCascadeSelection
   /// Set limit for the omega rejection on the invariant mass
   /// \param lowLimit Lower limit for the invariant mass distribution
   /// \param upLimit Upper limit for the invariant mass distribution
-  void setOmegaInvMassLimits(float lowLimit, float upLimit)
+  void setCompetingInvMassLimits(float lowLimit, float upLimit)
   {
-    fRejectOmega = true;
-    fInvMassOmegaLowLimit = lowLimit;
-    fInvMassOmegaUpLimit = upLimit;
+    fRejectCompetingMass = true;
+    fInvMassCompetingLowLimit = lowLimit;
+    fInvMassCompetingUpLimit = upLimit;
   }
 
  private:
@@ -217,9 +218,11 @@ class FemtoUniverseCascadeSelection
   float fInvMassLowLimit;
   float fInvMassUpLimit;
 
-  float fRejectOmega;
-  float fInvMassOmegaLowLimit;
-  float fInvMassOmegaUpLimit;
+  float fRejectCompetingMass;
+  float fInvMassCompetingLowLimit;
+  float fInvMassCompetingUpLimit;
+
+  bool isCascOmega;
 
   // float nSigmaPIDOffsetTPC;
 
@@ -259,8 +262,8 @@ class FemtoUniverseCascadeSelection
       femtoUniverseSelection::kLowerLimit, // DCA v0 to PV max
       femtoUniverseSelection::kLowerLimit, // v0 mass min
       femtoUniverseSelection::kUpperLimit, // v0 mass max
-    };                                     ///< Map to match a variable with
-                                           ///< its type
+    }; ///< Map to match a variable with
+       ///< its type
 
   static constexpr std::string_view mSelectionHelper[kNcascadeSelection] = {
     "Cascade particle sign (+1 or -1)",
@@ -288,16 +291,16 @@ class FemtoUniverseCascadeSelection
 }; // namespace femtoUniverse
 
 template <o2::aod::femtouniverseparticle::ParticleType part, o2::aod::femtouniverseparticle::ParticleType daugh, o2::aod::femtouniverseparticle::ParticleType bach, typename cutContainerType>
-void FemtoUniverseCascadeSelection::init(HistogramRegistry* registry)
+void FemtoUniverseCascadeSelection::init(HistogramRegistry* registry, bool isSelectCascOmega)
 {
 
   if (registry) {
     mHistogramRegistry = registry;
-    fillSelectionHistogram<part>();  // cascade - moze tego nie trzeba ?
+    fillSelectionHistogram<part>();  // cascade
     fillSelectionHistogram<daugh>(); // pos, neg
     fillSelectionHistogram<bach>();  // bach
 
-    AxisSpec massAxisCascade = {600, 1.25f, 1.4f, "m_{#Cascade} (GeV/#it{c}^{2})"};
+    AxisSpec massAxisCascade = {2200, 1.25f, 1.8f, "m_{#Cascade} (GeV/#it{c}^{2})"};
     AxisSpec massAxisV0 = {600, 0.0f, 3.0f, "m_{#V0} (GeV/#it{c}^{2})"};
     AxisSpec DCADaughAxis = {1000, 0.0f, 2.0f, "DCA (cm)"};
     AxisSpec DCAToPVAxis = {1000, -10.0f, 10.0f, "DCA to PV (cm)"};
@@ -314,9 +317,6 @@ void FemtoUniverseCascadeSelection::init(HistogramRegistry* registry)
       LOG(fatal) << "FemtoUniverseCascadeCuts: Number of selections to large for your "
                     "container - quitting!";
     }
-    // SPRAWDZIC czy to jest potrzebne:
-    // std::string folderName = static_cast<std::string>(
-    //   o2::aod::femtouniverseparticle::ParticleTypeName[part]);
 
     PosDaughTrack.init<aod::femtouniverseparticle::ParticleType::kV0Child,
                        aod::femtouniverseparticle::TrackType::kPosChild,
@@ -413,6 +413,8 @@ void FemtoUniverseCascadeSelection::init(HistogramRegistry* registry)
                                            femtoUniverseSelection::kLowerLimit);
   fV0InvMassUpLimit = getMinimalSelection(femtoUniverseCascadeSelection::kCascadeV0MassMax,
                                           femtoUniverseSelection::kUpperLimit);
+
+  isCascOmega = isSelectCascOmega;
 }
 
 template <typename Col, typename Casc, typename Track>
@@ -430,19 +432,20 @@ bool FemtoUniverseCascadeSelection::isSelectedMinimal(Col const& col, Casc const
 
   const float cpav0 = cascade.v0cosPA(col.posX(), col.posY(), col.posZ());
   const float cpaCasc = cascade.casccosPA(col.posX(), col.posY(), col.posZ());
+  const float dcav0topv = cascade.dcav0topv(col.posX(), col.posY(), col.posZ());
   const float invMassLambda = cascade.mLambda();
-  const float invMassXi = cascade.mXi();
+  const float invMass = isCascOmega ? cascade.mOmega() : cascade.mXi();
 
   if (invMassLambda < fV0InvMassLowLimit || invMassLambda > fV0InvMassUpLimit) {
     return false;
   }
-  if (invMassXi < fInvMassLowLimit || invMassXi > fInvMassUpLimit) {
+  if (invMass < fInvMassLowLimit || invMass > fInvMassUpLimit) {
     return false;
   }
-  if (fRejectOmega) {
-    const float invMassOmega = cascade.mOmega();
-    if (invMassOmega > fInvMassOmegaLowLimit &&
-        invMassOmega < fInvMassOmegaUpLimit) {
+  if (fRejectCompetingMass) {
+    const float invMassCompeting = isCascOmega ? cascade.mXi() : cascade.mOmega();
+    if (invMassCompeting > fInvMassCompetingLowLimit &&
+        invMassCompeting < fInvMassCompetingUpLimit) {
       return false;
     }
   }
@@ -480,11 +483,22 @@ bool FemtoUniverseCascadeSelection::isSelectedMinimal(Col const& col, Casc const
     return false;
   }
   for (size_t i = 0; i < decVtx.size(); i++) {
-    if (nDecVtxMax > 0 && decVtx.at(i) > DecVtxMax) { // for cascades
+    if (nDecVtxMax > 0 && decVtx.at(i) > DecVtxMax) {
       return false;
     }
   }
-  // ADD: DCA pos neg bach v0
+  if (nDCAPosToPV > 0 && abs(cascade.dcapostopv()) < DCAPosToPV) {
+    return false;
+  }
+  if (nDCANegToPV > 0 && abs(cascade.dcanegtopv()) < DCANegToPV) {
+    return false;
+  }
+  if (nDCABachToPV > 0 && abs(cascade.dcabachtopv()) < DCABachToPV) {
+    return false;
+  }
+  if (nDCAV0ToPV > 0 && abs(dcav0topv) < DCAV0ToPV) {
+    return false;
+  }
 
   if (!PosDaughTrack.isSelectedMinimal(posTrack)) {
     return false;
@@ -527,12 +541,13 @@ void FemtoUniverseCascadeSelection::fillCascadeQA(Col const& col, Casc const& ca
   // const std::vector<float> decVtx = {cascade.x(), cascade.y(), cascade.z()};
   const float cpav0 = cascade.v0cosPA(col.posX(), col.posY(), col.posZ());
   const float cpaCasc = cascade.casccosPA(col.posX(), col.posY(), col.posZ());
+  const float dcav0topv = cascade.dcav0topv(col.posX(), col.posY(), col.posZ());
 
   const float invMassLambda = cascade.mLambda();
-  const float invMassXi = cascade.mXi();
+  const float invMass = isCascOmega ? cascade.mOmega() : cascade.mXi();
 
   mHistogramRegistry->fill(HIST("CascadeQA/hInvMassV0Cut"), invMassLambda);
-  mHistogramRegistry->fill(HIST("CascadeQA/hInvMassCascadeCut"), invMassXi);
+  mHistogramRegistry->fill(HIST("CascadeQA/hInvMassCascadeCut"), invMass);
   mHistogramRegistry->fill(HIST("CascadeQA/hCascadePt"), cascade.pt());
   mHistogramRegistry->fill(HIST("CascadeQA/hCascadeEta"), cascade.eta());
   mHistogramRegistry->fill(HIST("CascadeQA/hCascadePhi"), cascade.phi());
@@ -545,7 +560,7 @@ void FemtoUniverseCascadeSelection::fillCascadeQA(Col const& col, Casc const& ca
   mHistogramRegistry->fill(HIST("CascadeQA/hDCAPosToPV"), cascade.dcapostopv());
   mHistogramRegistry->fill(HIST("CascadeQA/hDCANegToPV"), cascade.dcanegtopv());
   mHistogramRegistry->fill(HIST("CascadeQA/hDCABachToPV"), cascade.dcabachtopv());
-  mHistogramRegistry->fill(HIST("CascadeQA/hDCAV0ToPV"), cascade.cascradius());
+  mHistogramRegistry->fill(HIST("CascadeQA/hDCAV0ToPV"), dcav0topv);
 
   // is this necessary
   /*

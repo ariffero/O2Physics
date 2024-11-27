@@ -13,8 +13,10 @@
 // Analysis task to produce smeared pt, eta, phi for electrons/muons in dilepton analysis
 //    Please write to: daiki.sekihata@cern.ch
 
-#include <CCDB/BasicCCDBManager.h>
+#include <string>
 #include <chrono>
+
+#include "CCDB/BasicCCDBManager.h"
 #include "Framework/runDataProcessing.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/AnalysisDataModel.h"
@@ -221,12 +223,26 @@ struct ApplySmearing {
     applySmearing(tracksMC);
   }
 
-  void processDummyCocktail(aod::McParticles const&) {}
+  void processDummyCocktail(aod::McParticles const& tracksMC)
+  {
+    // don't apply smearing
+    for (auto& mctrack : tracksMC) {
+      int pdgCode = mctrack.pdgCode();
+      if (abs(pdgCode) == 11) {
+        smearedelectron(mctrack.pt(), mctrack.eta(), mctrack.phi(), 1.0, 0.0);
+      } else if (abs(pdgCode) == 13) {
+        smearedmuon(mctrack.pt(), mctrack.eta(), mctrack.phi(), 1.0, 0.0, mctrack.pt(), mctrack.eta(), mctrack.phi(), 1.0, 0.0);
+      } else {
+        smearedelectron(mctrack.pt(), mctrack.eta(), mctrack.eta(), 1.0, 0.0);
+        smearedmuon(mctrack.pt(), mctrack.eta(), mctrack.phi(), 1.0, 0.0, mctrack.pt(), mctrack.eta(), mctrack.phi(), 1.0, 0.0);
+      }
+    }
+  }
 
   void processDummyMCanalysis(ReducedMCTracks const&) {}
 
-  PROCESS_SWITCH(ApplySmearing, processMCanalysisEM, "Run for MC analysis", false);
-  PROCESS_SWITCH(ApplySmearing, processMCanalysisDQ, "Run for MC analysis", false);
+  PROCESS_SWITCH(ApplySmearing, processMCanalysisEM, "Run for MC analysis which uses skimmed EM data format", false);
+  PROCESS_SWITCH(ApplySmearing, processMCanalysisDQ, "Run for MC analysis which uses skimmed DQ data format", false);
   PROCESS_SWITCH(ApplySmearing, processCocktail, "Run for cocktail analysis", false);
   PROCESS_SWITCH(ApplySmearing, processDummyMCanalysis, "Dummy process function", false);
   PROCESS_SWITCH(ApplySmearing, processDummyCocktail, "Dummy process function", true);
