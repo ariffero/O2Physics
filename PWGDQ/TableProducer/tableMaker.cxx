@@ -71,6 +71,7 @@ using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
 using namespace o2::aod;
+using namespace o2::aod::rctsel;
 
 Zorro zorro;
 
@@ -235,6 +236,8 @@ struct TableMaker {
   Filter barrelSelectedTracks = ifnode(fIsRun2.node() == true, aod::track::trackType == uint8_t(aod::track::Run2Track), aod::track::trackType == uint8_t(aod::track::Track)) && o2::aod::track::pt >= fConfigBarrelTrackPtLow && nabs(o2::aod::track::eta) <= fConfigBarrelTrackMaxAbsEta && o2::aod::track::tpcSignal >= fConfigMinTpcSignal && o2::aod::track::tpcSignal <= fConfigMaxTpcSignal && o2::aod::track::tpcChi2NCl < 4.0f && o2::aod::track::itsChi2NCl < 36.0f;
 
   Filter muonFilter = o2::aod::fwdtrack::pt >= fConfigMuonPtLow;
+
+  RCTFlagsChecker muonChecker{"CBT_muon"};
 
   void init(o2::framework::InitContext& context)
   {
