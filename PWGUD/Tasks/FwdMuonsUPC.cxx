@@ -464,10 +464,10 @@ struct FwdMuonsUPC {
   {
     float rAbs = fwdTrack.rAtAbsorberEnd();
     float pDca = fwdTrack.pDca();
-    //TLorentzVector p;
+    // TLorentzVector p;
     auto mMu = particleMass(13);
     LorentzVectorD p(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
-    //p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
+    // p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
     float eta = p.Eta();
     float pt = p.Pt();
     float pDcaMax = rAbs < kRAbsMid ? kPDca1 : kPDca2;
