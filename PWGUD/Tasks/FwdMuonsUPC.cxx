@@ -32,6 +32,7 @@
 #include "TSystem.h"
 #include "TMath.h"
 #include "TRandom3.h"
+#include "Math.h/Vector4D.h"
 
 // table for saving tree with info on data
 namespace dimu
@@ -161,6 +162,8 @@ DECLARE_SOA_TABLE(RecoDimu, "AOD", "RECODIMU",
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
+
+using LorentzVectorD = ROOT::Math::LorentzVector<ROOT::Math::PxPyPzM4D<double>>;
 
 // constants used in the track selection
 const float kRAbsMin = 17.6;
@@ -461,9 +464,10 @@ struct FwdMuonsUPC {
   {
     float rAbs = fwdTrack.rAtAbsorberEnd();
     float pDca = fwdTrack.pDca();
-    TLorentzVector p;
+    //TLorentzVector p;
     auto mMu = particleMass(13);
-    p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
+    LorentzVectorD p(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
+    //p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
     float eta = p.Eta();
     float pt = p.Pt();
     float pDcaMax = rAbs < kRAbsMid ? kPDca1 : kPDca2;
