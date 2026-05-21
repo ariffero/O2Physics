@@ -25,6 +25,7 @@
 
 #include "TLorentzVector.h"
 #include "TRandom3.h"
+#include <Math/Vector4D.h>
 
 #include <unordered_map>
 #include <vector>
@@ -349,9 +350,16 @@ struct FwdMuonsUPC {
   {
     float rAbs = fwdTrack.rAtAbsorberEnd();
     float pDca = fwdTrack.pDca();
-    TLorentzVector p;
     auto mMu = particleMass(kMuonPDG);
-    p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
+    ROOT::Math::PxPyPzMVector p{
+      fwdTrack.px(),
+      fwdTrack.py(),
+      fwdTrack.pz(),
+      mMu
+    };
+    //TLorentzVector p;
+    //auto mMu = particleMass(kMuonPDG);
+    //p.SetXYZM(fwdTrack.px(), fwdTrack.py(), fwdTrack.pz(), mMu);
     float eta = p.Eta();
     float pt = p.Pt();
     float pDcaMax = rAbs < kRAbsMid ? kPDca1 : kPDca2;
