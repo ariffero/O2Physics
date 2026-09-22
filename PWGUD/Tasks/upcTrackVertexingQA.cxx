@@ -95,6 +95,7 @@ struct UpcTrackVertexingQA {
      {"Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
      {"Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 40.}}}},
      {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
+     {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
      {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -2., 2.}}}},
      {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -5., 5.}}}}}};
 
@@ -172,6 +173,7 @@ struct UpcTrackVertexingQA {
     registry.fill(HIST("Trk/hTpcNClsFound"), track.tpcNClsFound());
     registry.fill(HIST("Trk/hItsChi2NCl"), track.itsChi2NCl());
     registry.fill(HIST("Trk/hItsNCls"), track.itsNCls());
+    registry.fill(HIST("Trk/hItsNClsInnerBarrel"), track.itsNClsInnerBarrel());
     registry.fill(HIST("Trk/hDcaXY"), track.dcaXY());
     registry.fill(HIST("Trk/hDcaZ"), track.dcaZ());
 
