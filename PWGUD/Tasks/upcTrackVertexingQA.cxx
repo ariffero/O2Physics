@@ -11,6 +11,9 @@
 
 /// \file upcTrackVertexingQA.cxx
 /// \brief task to study the performance of vertexing for low-multiplicity UPC collisions
+/// \author Andrea Tavira Garcia a.tavira@cern.ch
+/// \author Andrea Giovanni Riffero andrea.giovanni.riffero@cern.ch
+
 ///
 
 #include "Common/DataModel/PIDResponseTPC.h"
