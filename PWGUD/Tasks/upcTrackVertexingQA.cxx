@@ -50,7 +50,7 @@ struct UpcTrackVertexingQA {
   Configurable<float> ptTrackMin{"ptTrackMin", 0.1, "min. track pT (GeV/c)"};
   Configurable<float> etaTrackMax{"etaTrackMax", 0.9, "max. |eta| of tracks"};
   Configurable<float> nSigmaTpcMax{"nSigmaTpcMax", 3.f, "max. TPC N_sigma (pion)"};
-  Configurable<int> nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
+  Configurable<int>   nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
   Configurable<float> massMin{"massMin", 0.5, "min. inv. mass (GeV/c^2)"};
   Configurable<float> massMax{"massMax", 1.3, "max. inv. mass (GeV/c^2)"};
 
@@ -77,33 +77,34 @@ struct UpcTrackVertexingQA {
   HistogramRegistry registry{
     "registry",
     {// candidate level
-     {"Cand/hMass", ";m_{#pi#pi} (GeV/#it{c}^{2});entries", {HistType::kTH1F, {axisMass}}},
-     {"Cand/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
-     {"Cand/hRapidity", ";#it{y};entries", {HistType::kTH1F, {{100, -1., 1.}}}},
+      {"Cand/hMass", ";m_{#pi#pi} (GeV/#it{c}^{2});entries", {HistType::kTH1F, {axisMass}}},
+      {"Cand/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
+      {"Cand/hRapidity", ";#it{y};entries", {HistType::kTH1F, {{100, -1., 1.}}}},
 
-     // collision level
-     {"Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}}},
-     {"Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}}},
-     {"Coll/hVtxZ", ";#it{z}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -20., 20.}}}},
-     {"Coll/hVtxX", ";#it{x}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
-     {"Coll/hVtxY", ";#it{y}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
-     {"Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
+      // collision level
+      {"Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}}},
+      {"Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}}},
+      {"Coll/hVtxZ", ";#it{z}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -20., 20.}}}},
+      {"Coll/hVtxX", ";#it{x}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
+      {"Coll/hVtxY", ";#it{y}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
+      {"Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
 
-     // track level (prongs of the candidate)
-     {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
-     {"Trk/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
-     {"Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
-     {"Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
-     {"Trk/hNSigmaPiVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}_{#pi}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
-     {"Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-     {"Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-     {"Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
-     {"Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 40.}}}},
-     {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-     {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-     {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -0.1, 0.1}}}},
-     {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}}}
-    };
+      // track level (prongs of the candidate)
+      {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
+      {"Trk/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
+      {"Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
+      {"Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
+      {"Trk/hNSigmaPiVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}_{#pi}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
+      {"Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
+      {"Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
+      {"Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
+      {"Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 40.}}}},
+      {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
+      {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
+      {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -0.1, 0.1}}}},
+      {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}}
+    }
+  };
      
 
   void init(InitContext&)
