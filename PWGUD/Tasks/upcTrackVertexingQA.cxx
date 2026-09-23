@@ -83,6 +83,11 @@ struct UpcTrackVertexingQA {
 
      // collision level
      {"Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}}},
+     {"Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}}},
+     {"Coll/hVtxZ", ";#it{z}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -20., 20.}}}},
+     {"Coll/hVtxX", ";#it{x}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
+     {"Coll/hVtxY", ";#it{y}_{vtx} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}}},
+     {"Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
 
      // track level (prongs of the candidate)
      {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
@@ -97,7 +102,9 @@ struct UpcTrackVertexingQA {
      {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
      {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
      {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -2., 2.}}}},
-     {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -5., 5.}}}}}};
+     {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -5., 5.}}}}}
+    };
+     
 
   void init(InitContext&)
   {
@@ -200,6 +207,11 @@ struct UpcTrackVertexingQA {
   void processRhoCand(aod::Collision const& collision, TracksExtraWPidPi const& tracks)
   {
     registry.fill(HIST("Coll/hNContrib"), collision.numContrib());
+    registry.fill(HIST("Coll/hBCid"), collision.bcId());
+    registry.fill(HIST("Coll/hVtxZ"), collision.posZ());
+    registry.fill(HIST("Coll/hVtxX"), collision.posX());
+    registry.fill(HIST("Coll/hVtxY"), collision.posY());
+    registry.fill(HIST("Coll/hVtxChi2"), collision.chi2());
 
     // Sequential ITS/TPC cuts on ALL tracks of the collision
     fillCutFlow(tracks);
