@@ -102,7 +102,22 @@ struct UpcTrackVertexingQA {
       {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
       {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
       {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -0.1, 0.1}}}},
-      {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}}
+      {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}},
+
+      // track level after collision matching
+      {"TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
+      {"TrkColl/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
+      {"TrkColl/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
+      {"TrkColl/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
+      {"TrkColl/hNSigmaPiVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}_{#pi}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
+      {"TrkColl/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
+      {"TrkColl/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
+      {"TrkColl/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
+      {"TrkColl/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 40.}}}},
+      {"TrkColl/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
+      {"TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
+      {"TrkColl/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{200, -0.1, 0.1}}}},
+      {"TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}}
     }
   };
      
@@ -171,19 +186,19 @@ struct UpcTrackVertexingQA {
   template <typename TTrack>
   void checkTpcTrackProperties(TTrack const& track)
   {
-    registry.fill(HIST("Trk/hPt"), track.pt());
-    registry.fill(HIST("Trk/hEta"), track.eta());
-    registry.fill(HIST("Trk/hChi2NCl"), track.tpcChi2NCl());
-    registry.fill(HIST("Trk/hTpcSignalVsP"), track.p(), track.tpcSignal());
-    registry.fill(HIST("Trk/hNSigmaPiVsP"), track.p(), track.tpcNSigmaPi());
-    registry.fill(HIST("Trk/hHasIts"), static_cast<int>(track.hasITS()));
-    registry.fill(HIST("Trk/hIsPvContrib"), static_cast<int>(track.isPVContributor()));
-    registry.fill(HIST("Trk/hTpcNClsFound"), track.tpcNClsFound());
-    registry.fill(HIST("Trk/hItsChi2NCl"), track.itsChi2NCl());
-    registry.fill(HIST("Trk/hItsNCls"), track.itsNCls());
-    registry.fill(HIST("Trk/hItsNClsInnerBarrel"), track.itsNClsInnerBarrel());
-    registry.fill(HIST("Trk/hDcaXY"), track.dcaXY());
-    registry.fill(HIST("Trk/hDcaZ"), track.dcaZ());
+    registry.fill(HIST("TrkColl/hPt"), track.pt());
+    registry.fill(HIST("TrkColl/hEta"), track.eta());
+    registry.fill(HIST("TrkColl/hChi2NCl"), track.tpcChi2NCl());
+    registry.fill(HIST("TrkColl/hTpcSignalVsP"), track.p(), track.tpcSignal());
+    registry.fill(HIST("TrkColl/hNSigmaPiVsP"), track.p(), track.tpcNSigmaPi());
+    registry.fill(HIST("TrkColl/hHasIts"), static_cast<int>(track.hasITS()));
+    registry.fill(HIST("TrkColl/hIsPvContrib"), static_cast<int>(track.isPVContributor()));
+    registry.fill(HIST("TrkColl/hTpcNClsFound"), track.tpcNClsFound());
+    registry.fill(HIST("TrkColl/hItsChi2NCl"), track.itsChi2NCl());
+    registry.fill(HIST("TrkColl/hItsNCls"), track.itsNCls());
+    registry.fill(HIST("TrkColl/hItsNClsInnerBarrel"), track.itsNClsInnerBarrel());
+    registry.fill(HIST("TrkColl/hDcaXY"), track.dcaXY());
+    registry.fill(HIST("TrkColl/hDcaZ"), track.dcaZ());
 
     // TODO: ambiguity (aod::AmbiguousTracks), ...
   }
@@ -203,6 +218,33 @@ struct UpcTrackVertexingQA {
     }
     return std::abs(track.tpcNSigmaPi()) <= nSigmaTpcMax;
   }
+  
+  // loop on tracks before grouping by collision
+  void processTracks(TracksExtraWPidPi const& tracks)
+  {
+      
+    for (auto const& track : tracks) {
+      // select good tracks for the rho
+      //LOGF(info, "Track pT: %f,", track.pt());
+      if(!isGoodTrack(track))
+        continue;
+
+      registry.fill(HIST("Trk/hPt"), track.pt());
+      registry.fill(HIST("Trk/hEta"), track.eta());
+      registry.fill(HIST("Trk/hChi2NCl"), track.tpcChi2NCl());
+      registry.fill(HIST("Trk/hTpcSignalVsP"), track.p(), track.tpcSignal());
+      registry.fill(HIST("Trk/hNSigmaPiVsP"), track.p(), track.tpcNSigmaPi());
+      registry.fill(HIST("Trk/hHasIts"), static_cast<int>(track.hasITS()));
+      registry.fill(HIST("Trk/hIsPvContrib"), static_cast<int>(track.isPVContributor()));
+      registry.fill(HIST("Trk/hTpcNClsFound"), track.tpcNClsFound());
+      registry.fill(HIST("Trk/hItsChi2NCl"), track.itsChi2NCl());
+      registry.fill(HIST("Trk/hItsNCls"), track.itsNCls());
+      registry.fill(HIST("Trk/hItsNClsInnerBarrel"), track.itsNClsInnerBarrel());
+      registry.fill(HIST("Trk/hDcaXY"), track.dcaXY());
+      registry.fill(HIST("Trk/hDcaZ"), track.dcaZ());
+    }
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processTracks, "Process tracks before asking for collisions", true);
 
   // Tracks are grouped by collision automatically
   void processRhoCand(aod::Collision const& collision, TracksExtraWPidPi const& tracks)
