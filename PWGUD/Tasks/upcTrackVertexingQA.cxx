@@ -43,6 +43,11 @@ using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
 
+enum class CandSpecies {
+  kRho = 0,
+  kJpsi = 1
+};
+
 struct UpcTrackVertexingQA {
   // Configurables
   Configurable<float> yCandMax{"yCandMax", 0.8, "max. cand. rapidity"};
@@ -56,22 +61,24 @@ struct UpcTrackVertexingQA {
 
   // Name shortenings
   // passed* columns are in TrackSelectionExtension; isGlobalTrack* and trackCutFlag in TrackSelection
-  using TracksExtraWPidPi = soa::Join<aod::Tracks, aod::TracksExtra, aod::TracksDCA,
-                                      aod::TrackSelection, aod::TrackSelectionExtension,
-                                      aod::pidTPCFullPi>;
+  using TracksExtraSels   = soa::Join<aod::Tracks, aod::TracksExtra, aod::TracksDCA,
+                            aod::TrackSelection, aod::TrackSelectionExtension>;
+  using TracksExtraWPidPi = soa::Join<TracksExtraSels, aod::pidTPCFullPi>;
+  using TracksExtraWPidMu = soa::Join<TracksExtraSels, aod::pidTPCFullMu>;
 
   static constexpr float MassPion = o2::constants::physics::MassPionCharged;
+  static constexpr float MassMuon = o2::constants::physics::MassMuon;
 
   // Ordered list of cuts. The cumulative cut flow follows this order,
   // so reorder CutLabels and getCutResults together to change what "tighter" means.
   static constexpr int NCuts = 8;
   static constexpr std::array<const char*, NCuts> CutLabels = {
-    "all tracks", "hasTPC", "passedEtaRange",
-    "passedTPCNCls", "passedTPCChi2NDF", "passedITSNCls",
+    "all tracks", "hasTPC", "passedTPCNCls",
+    "passedEtaRange", "passedTPCChi2NDF", "passedITSNCls",
     "passedITSChi2NDF", "hasITS"};
 
   // Axes
-  ConfigurableAxis axisMass{"axisMass", {160, 0.4, 1.2}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
+  ConfigurableAxis axisMass{"axisMass", {200, 2.0, 4.0}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
   ConfigurableAxis axisPt{"axisPt", {200, 0., 2.}, "#it{p}_{T} (GeV/#it{c})"};
 
   HistogramRegistry registry{
@@ -94,7 +101,7 @@ struct UpcTrackVertexingQA {
       {"Trk/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
       {"Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
       {"Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
-      {"Trk/hNSigmaPiVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}_{#pi}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
+      {"Trk/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
       {"Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
       {"Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
       {"Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
@@ -109,7 +116,7 @@ struct UpcTrackVertexingQA {
       {"TrkColl/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
       {"TrkColl/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
       {"TrkColl/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
-      {"TrkColl/hNSigmaPiVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}_{#pi}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
+      {"TrkColl/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
       {"TrkColl/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
       {"TrkColl/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
       {"TrkColl/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{160, 0., 160.}}}},
@@ -120,7 +127,6 @@ struct UpcTrackVertexingQA {
       {"TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}}
     }
   };
-     
 
   void init(InitContext&)
   {
@@ -139,6 +145,16 @@ struct UpcTrackVertexingQA {
       hCum->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
       hSingle->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
       hPerColl->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
+    }
+  }
+
+  template <CandSpecies species, typename TTrack>
+  float getNSigma(TTrack const& track)
+  {
+    if constexpr (species == CandSpecies::kRho) {
+      return track.tpcNSigmaPi();
+    } else {
+      return track.tpcNSigmaMu();
     }
   }
 
@@ -183,14 +199,14 @@ struct UpcTrackVertexingQA {
   }
 
   // Basic kinematic / TPC properties of a candidate prong
-  template <typename TTrack>
+  template <CandSpecies species, typename TTrack>
   void checkTpcTrackProperties(TTrack const& track)
   {
     registry.fill(HIST("TrkColl/hPt"), track.pt());
     registry.fill(HIST("TrkColl/hEta"), track.eta());
     registry.fill(HIST("TrkColl/hChi2NCl"), track.tpcChi2NCl());
     registry.fill(HIST("TrkColl/hTpcSignalVsP"), track.p(), track.tpcSignal());
-    registry.fill(HIST("TrkColl/hNSigmaPiVsP"), track.p(), track.tpcNSigmaPi());
+    registry.fill(HIST("TrkColl/hNSigmaVsP"), track.p(), getNSigma<species>(track));
     registry.fill(HIST("TrkColl/hHasIts"), static_cast<int>(track.hasITS()));
     registry.fill(HIST("TrkColl/hIsPvContrib"), static_cast<int>(track.isPVContributor()));
     registry.fill(HIST("TrkColl/hTpcNClsFound"), track.tpcNClsFound());
@@ -204,7 +220,7 @@ struct UpcTrackVertexingQA {
   }
 
   // Basic single-track selection used to build the rho candidate
-  template <typename TTrack>
+  template <CandSpecies species, typename TTrack>
   bool isGoodTrack(TTrack const& track)
   {
     if (!track.hasTPC()) {
@@ -216,24 +232,25 @@ struct UpcTrackVertexingQA {
     if (track.pt() < ptTrackMin || std::abs(track.eta()) > etaTrackMax) {
       return false;
     }
-    return std::abs(track.tpcNSigmaPi()) <= nSigmaTpcMax;
+    return std::abs(getNSigma<species>(track)) <= nSigmaTpcMax;
   }
-  
+
   // loop on tracks before grouping by collision
-  void processTracks(TracksExtraWPidPi const& tracks)
+  template<CandSpecies species, typename TTrack>
+  void fillTrackPlotsBeforeGrouping(TTrack const& tracks)
   {
-      
+
     for (auto const& track : tracks) {
-      // select good tracks for the rho
+      // select good tracks for the candidate
       //LOGF(info, "Track pT: %f,", track.pt());
-      if(!isGoodTrack(track))
+      if(!isGoodTrack<species>(track))
         continue;
 
       registry.fill(HIST("Trk/hPt"), track.pt());
       registry.fill(HIST("Trk/hEta"), track.eta());
       registry.fill(HIST("Trk/hChi2NCl"), track.tpcChi2NCl());
       registry.fill(HIST("Trk/hTpcSignalVsP"), track.p(), track.tpcSignal());
-      registry.fill(HIST("Trk/hNSigmaPiVsP"), track.p(), track.tpcNSigmaPi());
+      registry.fill(HIST("Trk/hNSigmaVsP"), track.p(), getNSigma<species>(track));
       registry.fill(HIST("Trk/hHasIts"), static_cast<int>(track.hasITS()));
       registry.fill(HIST("Trk/hIsPvContrib"), static_cast<int>(track.isPVContributor()));
       registry.fill(HIST("Trk/hTpcNClsFound"), track.tpcNClsFound());
@@ -244,10 +261,22 @@ struct UpcTrackVertexingQA {
       registry.fill(HIST("Trk/hDcaZ"), track.dcaZ());
     }
   }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processTracks, "Process tracks before asking for collisions", true);
+
+  void processRhoTracksBeforeGrouping(TracksExtraWPidPi const& tracks)
+  {
+    fillTrackPlotsBeforeGrouping<CandSpecies::kRho>(tracks);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGrouping, "Process rho tracks before asking for collisions", true);
+
+  void processJpsiTracksBeforeGrouping(TracksExtraWPidMu const& tracks)
+  {
+    fillTrackPlotsBeforeGrouping<CandSpecies::kJpsi>(tracks);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGrouping, "Process J/Psi tracks before asking for collisions", false);
 
   // Tracks are grouped by collision automatically
-  void processRhoCand(aod::Collision const& collision, TracksExtraWPidPi const& tracks)
+  template <CandSpecies species, typename TTrack>
+  void checkCandidateTracks(aod::Collision const& collision, TTrack const& tracks, float candMass)
   {
     registry.fill(HIST("Coll/hNContrib"), collision.numContrib());
     registry.fill(HIST("Coll/hBCid"), collision.bcId());
@@ -259,15 +288,15 @@ struct UpcTrackVertexingQA {
     // Sequential ITS/TPC cuts on ALL tracks of the collision
     fillCutFlow(tracks);
 
-    // Select tracks for the rho candidate
+    // Select tracks for the candidate
     std::vector<decltype(tracks.begin())> goodTracks;
     for (auto const& track : tracks) {
-      if (isGoodTrack(track)) {
+      if (isGoodTrack<species>(track)) {
         goodTracks.push_back(track);
       }
     }
 
-    // Exactly two tracks with opposite charge -> rho candidate
+    // Exactly two tracks with opposite charge -> candidate
     if (goodTracks.size() != 2) {
       return;
     }
@@ -277,25 +306,41 @@ struct UpcTrackVertexingQA {
       return;
     }
 
-    ROOT::Math::PxPyPzMVector p0(track0.px(), track0.py(), track0.pz(), MassPion);
-    ROOT::Math::PxPyPzMVector p1(track1.px(), track1.py(), track1.pz(), MassPion);
-    auto rho = p0 + p1;
+    ROOT::Math::PxPyPzMVector p0(track0.px(), track0.py(), track0.pz(), candMass);
+    ROOT::Math::PxPyPzMVector p1(track1.px(), track1.py(), track1.pz(), candMass);
+    auto candidate = p0 + p1;
 
-    if (rho.M() < massMin || rho.M() > massMax) {
+    LOGF(info, "Candidate pT: %f,", candidate.pt());
+    LOGF(info, "Candidate mass: %f,", candidate.M());
+    LOGF(info, "Candidate rapidity: %f,", candidate.Rapidity());
+
+    if (candidate.M() < massMin || candidate.M() > massMax) {
       return;
     }
-    if (rho.Pt() < ptCandMin || std::abs(rho.Rapidity()) > yCandMax) {
+    if (candidate.Pt() < ptCandMin || std::abs(candidate.Rapidity()) > yCandMax) {
       return;
     }
 
-    registry.fill(HIST("Cand/hMass"), rho.M());
-    registry.fill(HIST("Cand/hPt"), rho.Pt());
-    registry.fill(HIST("Cand/hRapidity"), rho.Rapidity());
+    registry.fill(HIST("Cand/hMass"), candidate.M());
+    registry.fill(HIST("Cand/hPt"), candidate.Pt());
+    registry.fill(HIST("Cand/hRapidity"), candidate.Rapidity());
 
-    checkTpcTrackProperties(track0);
-    checkTpcTrackProperties(track1);
+    checkTpcTrackProperties<species>(track0);
+    checkTpcTrackProperties<species>(track1);
+  }
+
+  // Tracks are grouped by collision automatically
+  void processRhoCand(aod::Collision const& collision, TracksExtraWPidPi const& tracks)
+  {
+    checkCandidateTracks<CandSpecies::kRho>(collision, tracks, MassPion);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processRhoCand, "Rho -> pi pi candidates and track QA", true);
+
+  void processJpsiCand(aod::Collision const& collision, TracksExtraWPidMu const& tracks)
+  {
+    checkCandidateTracks<CandSpecies::kJpsi>(collision, tracks, MassMuon);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiCand, "J/Psi -> mu mu candidates and track QA", false);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
