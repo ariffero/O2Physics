@@ -85,15 +85,12 @@ struct UpcTrackVertexingQA {
 
   HistogramConfigSpec hVtxZ{HistType::kTH1F, {{200, -20., 20.}}};
   HistogramConfigSpec hVtxXY{HistType::kTH1F, {{200, -0.05, 0.05}}};
+  HistogramConfigSpec hPtTrk{HistType::kTH1F, {{200, 0.0, 2.0}}};
+  HistogramConfigSpec hEtaTrk{HistType::kTH1F, {{100, -1.0, 1.0}}};
 
   HistogramRegistry registry{
     "registry",
-    {// candidate level
-      {"Cand/hMass", ";m_{#pi#pi} (GeV/#it{c}^{2});entries", {HistType::kTH1F, {axisMass}}},
-      {"Cand/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
-      {"Cand/hRapidity", ";#it{y};entries", {HistType::kTH1F, {axisY}}},
-      {"Cand/hPtVsRapidity", ";#it{p}_{T} (GeV/#it{c});#it{y}", {HistType::kTH2F, {axisPt, axisY}}},
-
+    {
       // collision level
       {"Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}}},
       {"Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}}},
@@ -103,8 +100,8 @@ struct UpcTrackVertexingQA {
       {"Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
 
       // track level (all good tracks, before grouping by collision)
-      {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
-      {"Trk/hEta", ";#eta;entries", {HistType::kTH1F, {axisY}}},
+      {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", hPtTrk},
+      {"Trk/hEta", ";#eta;entries", hEtaTrk},
       {"Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
       {"Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
       {"Trk/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
@@ -118,8 +115,8 @@ struct UpcTrackVertexingQA {
       {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.5, 0.5}}}},
 
       // track level (prongs of the candidate, after collision matching)
-      {"TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}}},
-      {"TrkColl/hEta", ";#eta;entries", {HistType::kTH1F, {{100, -1., 1.}}}},
+      {"TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", hPtTrk},
+      {"TrkColl/hEta", ";#eta;entries", hEtaTrk},
       {"TrkColl/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
       {"TrkColl/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
       {"TrkColl/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
@@ -152,6 +149,12 @@ struct UpcTrackVertexingQA {
       hSingle->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
       hPerColl->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
     }
+  
+    // candidate level plots
+    registry.add("Cand/hMass", ";m_{#pi#pi} (GeV/#it{c}^{2});entries", {HistType::kTH1F, {axisMass}});
+    registry.add("Cand/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}});
+    registry.add("Cand/hRapidity", ";#it{y};entries", {HistType::kTH1F, {axisY}});
+    registry.add("Cand/hPtVsRapidity", ";#it{p}_{T} (GeV/#it{c});#it{y}", {HistType::kTH2F, {axisPt, axisY}});
 
     // MC histograms are only booked if at least one MC process function is enabled
     const bool needMc = doprocessRhoTracksBeforeGroupingMcInfo || doprocessJpsiTracksBeforeGroupingMcInfo ||
@@ -171,13 +174,13 @@ struct UpcTrackVertexingQA {
     registry.add("Matched/Coll/hVtxY", ";#it{y}_{vtx}^{MC matched} (cm);entries", hVtxXY);
     registry.add("Matched/Coll/hVtxZ", ";#it{z}_{vtx}^{MC matched} (cm);entries", hVtxZ);
 
-    registry.add("Matched/Trk/hPt", ";#it{p}_{T}^{MC matched} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}});
-    registry.add("Matched/Trk/hEta", ";#eta^{MC};entries", {HistType::kTH1F, {axisY}});
+    registry.add("Matched/Trk/hPt", ";#it{p}_{T}^{MC matched} (GeV/#it{c});entries", hPtTrk);
+    registry.add("Matched/Trk/hEta", ";#eta^{MC};entries", hEtaTrk);
     registry.add("Matched/Trk/hMcIsPhysicalPrimary", ";is physical primary;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
     registry.add("Matched/Trk/hMotherPdg", ";mother PDG code;entries", {HistType::kTH1F, {{1001, 0.5, 1000.5}}});
 
-    registry.add("Matched/TrkColl/hPt", ";#it{p}_{T}^{MC matched} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}});
-    registry.add("Matched/TrkColl/hEta", ";#eta^{MC};entries", {HistType::kTH1F, {axisY}});
+    registry.add("Matched/TrkColl/hPt", ";#it{p}_{T}^{MC matched} (GeV/#it{c});entries", hPtTrk);
+    registry.add("Matched/TrkColl/hEta", ";#eta^{MC};entries", hEtaTrk);
     registry.add("Matched/TrkColl/hMcIsPhysicalPrimary", ";is physical primary;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
     registry.add("Matched/TrkColl/hMotherPdg", ";mother PDG code;entries", {HistType::kTH1F, {{1001, 0.5, 1000.5}}});
 
@@ -186,8 +189,8 @@ struct UpcTrackVertexingQA {
     registry.add("McGen/Coll/hVtxY", ";#it{y}_{vtx}^{MC} (cm);entries", hVtxXY);
     registry.add("McGen/Coll/hVtxZ", ";#it{z}_{vtx}^{MC} (cm);entries", hVtxZ);
 
-    registry.add("McGen/Part/hPt", ";#it{p}_{T}^{MC} (GeV/#it{c});entries", {HistType::kTH1F, {axisPt}});
-    registry.add("McGen/Part/hEta", ";#eta^{MC};entries", {HistType::kTH1F, {axisY}});
+    registry.add("McGen/Part/hPt", ";#it{p}_{T}^{MC} (GeV/#it{c});entries", hPtTrk);
+    registry.add("McGen/Part/hEta", ";#eta^{MC};entries", hEtaTrk);
     registry.add("McGen/Part/hMcIsPhysicalPrimary", ";is physical primary;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
 
     registry.add("McGen/MotherPart/hMotherPdg", ";mother PDG code;entries", {HistType::kTH1F, {{1001, 0.5, 1000.5}}});
