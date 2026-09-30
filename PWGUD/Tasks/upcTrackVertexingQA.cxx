@@ -80,7 +80,7 @@ struct UpcTrackVertexingQA {
 
   // Axes (the mass axis matches the default rho window; override it for the J/psi)
   ConfigurableAxis axisMass{"axisMass", {200, 0.5, 1.3}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
-  ConfigurableAxis axisPt{"axisPt", {200, 0., 2.}, "#it{p}_{T} (GeV/#it{c})"};
+  ConfigurableAxis axisPt{"axisPt", {VARIABLE_WIDTH, 0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.175, 0.20, 0.25, 0.30, 0.40, 0.50}, "#it{p}_{T} (GeV/#it{c})"};
   ConfigurableAxis axisY{"axisY", {100, -1., 1.}, "Rapidity"};
 
   HistogramConfigSpec hVtxZ{HistType::kTH1F, {{200, -20., 20.}}};
