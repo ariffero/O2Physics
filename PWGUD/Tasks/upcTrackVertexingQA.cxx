@@ -114,7 +114,7 @@ struct UpcTrackVertexingQA {
     registry.add("Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
     registry.add("Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
     registry.add("Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
-    registry.add("Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}});
+    registry.add("Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}});
 
     // track level (prongs of the candidate, after collision matching)
     registry.add("TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtTrk}});
@@ -129,7 +129,7 @@ struct UpcTrackVertexingQA {
     registry.add("TrkColl/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
     registry.add("TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
     registry.add("TrkColl/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
-    registry.add("TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}});
+    registry.add("TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}});
 
     // Cut flows: cumulative, single cut, and tracks per collision vs. cut step
     registry.add("Cut/hCutFlowCumulative", "tracks surviving cuts applied in sequence;;entries",
