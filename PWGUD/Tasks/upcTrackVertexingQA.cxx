@@ -89,51 +89,48 @@ struct UpcTrackVertexingQA {
   HistogramConfigSpec hVtxY{HistType::kTH1F, {{60, -0.015, 0.015}}};
   HistogramConfigSpec hEtaTrk{HistType::kTH1F, {{100, -1.0, 1.0}}};
 
-  HistogramRegistry registry{
-    "registry",
-    {
-      // collision level
-      {"Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}}},
-      {"Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}}},
-      {"Coll/hVtxZ", ";#it{z}_{vtx} (cm);entries", hVtxZ},
-      {"Coll/hVtxX", ";#it{x}_{vtx} (cm);entries", hVtxX},
-      {"Coll/hVtxY", ";#it{y}_{vtx} (cm);entries", hVtxY},
-      {"Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
-
-      // track level (all good tracks, before grouping by collision)
-      {"Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtTrk}}},
-      {"Trk/hEta", ";#eta;entries", hEtaTrk},
-      {"Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{50, 0., 5.}}}},
-      {"Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
-      {"Trk/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
-      {"Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-      {"Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-      {"Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}}},
-      {"Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
-      {"Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-      {"Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-      {"Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}}},
-      {"Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}}},
-
-      // track level (prongs of the candidate, after collision matching)
-      {"TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtTrk}}},
-      {"TrkColl/hEta", ";#eta;entries", hEtaTrk},
-      {"TrkColl/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{50, 0., 5.}}}},
-      {"TrkColl/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}}},
-      {"TrkColl/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}}},
-      {"TrkColl/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-      {"TrkColl/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}}},
-      {"TrkColl/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}}},
-      {"TrkColl/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}}},
-      {"TrkColl/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-      {"TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}}},
-      {"TrkColl/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}}},
-      {"TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}}}
-    }
-  };
+  HistogramRegistry registry{"registry"};
 
   void init(InitContext&)
   {
+    // collision level
+    registry.add("Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}});
+    registry.add("Coll/hBCid", ";BCid;entries", {HistType::kTH1F, {{1000, 0., 1000.}}});
+    registry.add("Coll/hVtxZ", ";#it{z}_{vtx} (cm);entries", hVtxZ);
+    registry.add("Coll/hVtxX", ";#it{x}_{vtx} (cm);entries", hVtxX);
+    registry.add("Coll/hVtxY", ";#it{y}_{vtx} (cm);entries", hVtxY);
+    registry.add("Coll/hVtxChi2", ";#chi^{2} vtx;entries", {HistType::kTH1F, {{100, 0., 10.}}});
+
+    // track level (all good tracks, before grouping by collision)
+    registry.add("Trk/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtTrk}});
+    registry.add("Trk/hEta", ";#eta;entries", hEtaTrk);
+    registry.add("Trk/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{50, 0., 5.}}});
+    registry.add("Trk/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}});
+    registry.add("Trk/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}});
+    registry.add("Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
+    registry.add("Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
+    registry.add("Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}});
+    registry.add("Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}});
+    registry.add("Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
+    registry.add("Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}});
+
+    // track level (prongs of the candidate, after collision matching)
+    registry.add("TrkColl/hPt", ";#it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtTrk}});
+    registry.add("TrkColl/hEta", ";#eta;entries", hEtaTrk);
+    registry.add("TrkColl/hChi2NCl", ";#chi^{2}/N_{cls} TPC;entries", {HistType::kTH1F, {{50, 0., 5.}}});
+    registry.add("TrkColl/hTpcSignalVsP", ";#it{p} (GeV/#it{c});TPC d#it{E}/d#it{x}", {HistType::kTH2F, {{200, 0., 2.}, {300, 0., 300.}}});
+    registry.add("TrkColl/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}});
+    registry.add("TrkColl/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
+    registry.add("TrkColl/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
+    registry.add("TrkColl/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}});
+    registry.add("TrkColl/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}});
+    registry.add("TrkColl/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("TrkColl/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
+    registry.add("TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{60, -0.15, 0.15}}});
+
     // Cut flows: cumulative, single cut, and tracks per collision vs. cut step
     registry.add("Cut/hCutFlowCumulative", "tracks surviving cuts applied in sequence;;entries",
                  HistType::kTH1F, {{NCuts, -0.5, NCuts - 0.5}});
