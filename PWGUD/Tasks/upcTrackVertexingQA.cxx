@@ -52,10 +52,7 @@ struct UpcTrackVertexingQA {
   Configurable<float> ptCandMin{"ptCandMin", 0., "min. cand. pT (GeV/c)"};
   Configurable<float> ptTrackMin{"ptTrackMin", 0.1, "min. track pT (GeV/c)"};
   Configurable<float> etaTrackMax{"etaTrackMax", 0.9, "max. |eta| of tracks"};
-  Configurable<float> nSigmaTpcMax{"nSigmaTpcMax", 3.f, "max. TPC N_sigma (pion)"};
   Configurable<int> nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
-  Configurable<float> massMin{"massMin", 0.5, "min. inv. mass (GeV/c^2)"};
-  Configurable<float> massMax{"massMax", 1.3, "max. inv. mass (GeV/c^2)"};
 
   // Name shortenings
   // passed* columns are in TrackSelectionExtension; isGlobalTrack* and trackCutFlag in TrackSelection
@@ -296,7 +293,10 @@ struct UpcTrackVertexingQA {
     if (track.pt() < ptTrackMin || std::abs(track.eta()) > etaTrackMax) {
       return false;
     }
-    return std::abs(getNSigma<species>(track)) <= nSigmaTpcMax;
+    if (std::abs(track.dcaZ()) >= 999 || std::abs(track.dcaXY()) >= 999) {
+      return false;
+    }
+    return true;
   }
 
   // Loop on tracks before grouping by collision
@@ -308,6 +308,9 @@ struct UpcTrackVertexingQA {
       if (!isGoodTrack<species>(track)) {
         continue;
       }
+
+      //LOGF(info, "Track DCA z: %f", track.dcaZ());
+      //LOGF(info, "Track DCA xy: %f", track.dcaXY());
 
       registry.fill(HIST("Trk/hPt"), track.pt());
       registry.fill(HIST("Trk/hEta"), track.eta());
@@ -385,9 +388,6 @@ struct UpcTrackVertexingQA {
     ROOT::Math::PxPyPzMVector p1(track1.px(), track1.py(), track1.pz(), candMass);
     auto candidate = p0 + p1;
 
-    if (candidate.M() < massMin || candidate.M() > massMax) {
-      return;
-    }
     if (candidate.Pt() < ptCandMin || std::abs(candidate.Rapidity()) > yCandMax) {
       return;
     }
