@@ -64,6 +64,9 @@ struct UpcTrackVertexingQA {
   using TracksExtraWPidMuMc = soa::Join<TracksExtraWPidMu, aod::McTrackLabels>;
   using CollisionsWithMc = soa::Join<aod::Collisions, aod::McCollisionLabels>;
 
+  using TracksExtraIU = soa::Join<aod::TracksIU, aod::TracksExtra, aod::TracksDCA,
+                                    aod::TrackSelection, aod::TrackSelectionExtension>;
+
   static constexpr float MassPion = o2::constants::physics::MassPionCharged;
   static constexpr float MassMuon = o2::constants::physics::MassMuon;
 
@@ -109,7 +112,7 @@ struct UpcTrackVertexingQA {
     registry.add("Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}});
     registry.add("Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}});
     registry.add("Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
-    registry.add("Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{4, -0.5, 3.5}}});
     registry.add("Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
     registry.add("Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}});
 
@@ -124,9 +127,14 @@ struct UpcTrackVertexingQA {
     registry.add("TrkColl/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{90, 60, 150.}}});
     registry.add("TrkColl/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}});
     registry.add("TrkColl/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
-    registry.add("TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
+    registry.add("TrkColl/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{4, -0.5, 3.5}}});
     registry.add("TrkColl/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
     registry.add("TrkColl/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}});
+
+    registry.add("TrkColl/hTrackSizePerEvent", ";#it{N}_{tracks} per event;entries", {HistType::kTH1F, {{10, -0.5, 9.5}}});
+
+    // collision Id counter
+    registry.add("Coll/hCollIdCounter", ";collision ID;entries", {HistType::kTH1F, {{3, -1.5, 1.5}}});
 
     // Cut flows: cumulative, single cut, and tracks per collision vs. cut step
     registry.add("Cut/hCutFlowCumulative", "tracks surviving cuts applied in sequence;;entries",
@@ -281,7 +289,7 @@ struct UpcTrackVertexingQA {
   }
 
   // Basic single-track selection used to build the candidate
-  template <CandSpecies species, typename TTrack>
+  template <typename TTrack>
   bool isGoodTrack(TTrack const& track)
   {
     if (!track.hasTPC()) {
@@ -305,7 +313,7 @@ struct UpcTrackVertexingQA {
   {
     for (auto const& track : tracks) {
       // select good tracks for the candidate
-      if (!isGoodTrack<species>(track)) {
+      if (!isGoodTrack(track)) {
         continue;
       }
 
@@ -369,10 +377,16 @@ struct UpcTrackVertexingQA {
     // Select tracks for the candidate
     std::vector<decltype(tracks.begin())> goodTracks;
     for (auto const& track : tracks) {
-      if (isGoodTrack<species>(track)) {
+      if (isGoodTrack(track)) {
         goodTracks.push_back(track);
+        if (!track.has_collision()) {
+          continue;
+        }
+        checkTpcTrackProperties<species, isMc>(track);
       }
     }
+
+    registry.fill(HIST("TrkColl/hTrackSizePerEvent"), goodTracks.size());
 
     // Exactly two tracks with opposite charge -> candidate
     if (goodTracks.size() != 2) {
@@ -411,8 +425,8 @@ struct UpcTrackVertexingQA {
       }
     }
 
-    checkTpcTrackProperties<species, isMc>(track0);
-    checkTpcTrackProperties<species, isMc>(track1);
+    //checkTpcTrackProperties<species, isMc>(track0);
+    //checkTpcTrackProperties<species, isMc>(track1);
   }
 
   // Generated (MC truth) level: daughters and their mothers
@@ -517,6 +531,33 @@ struct UpcTrackVertexingQA {
     checkMcGen<CandSpecies::kJpsi>(mcCollision, mcParticles);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processMcGenJpsi, "Generated J/Psi -> mu mu", false);
+
+
+
+
+  void processTracksIU(TracksExtraIU const& tracks) {
+    // track loop
+    for (const auto& track : tracks) {
+
+      if (!isGoodTrack(track)) {
+        continue;
+      }
+
+      int32_t collId = track.collisionId();
+
+      if (collId < 0) {
+        registry.fill(HIST("Coll/hCollIdCounter"), -1);
+      }
+      else if (collId > 0) {
+        registry.fill(HIST("Coll/hCollIdCounter"), 1);
+      } else {
+        registry.fill(HIST("Coll/hCollIdCounter"), 0);
+      }
+    }
+  }
+
+  PROCESS_SWITCH(UpcTrackVertexingQA, processTracksIU, "Track QA for IU tracks", false);
+
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
