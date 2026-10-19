@@ -110,7 +110,7 @@ struct UpcTrackVertexingQA {
   // so reorder CutLabels and getCutResults together to change what "tighter" means.
   static constexpr int NCuts = 6;
   static constexpr std::array<const char*, NCuts> CutLabels = {
-    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "DCA assigned"};
+    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS"};
   
   static constexpr int NCutsGen = 3;
   static constexpr std::array<const char*, NCutsGen> CutLabelsGen = {
@@ -277,8 +277,8 @@ struct UpcTrackVertexingQA {
     if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[4], 1.);
     if (earlyStop == 4) return true;
 
-    // DCA assigned
-    if (std::abs(track.dcaZ()) >= UnassignedDCA || std::abs(track.dcaXY()) >= UnassignedDCA) {
+    // tracks has ITS info
+    if (!track.hasITS()) {
       return false;
     }
     if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[5], 1.);
@@ -351,7 +351,7 @@ struct UpcTrackVertexingQA {
       fillTrackHistograms<species, 0, isMc, NCuts>(track);
       // all TPC tracks
       fillTrackHistograms<species, 3, false, 1>(track);
-      // all tracks after kinematic cuts
+      // all TPC tracks after kinematic cuts
       fillTrackHistograms<species, 4, false, 4>(track);
       if (collId < 0) {
         fillTrackHistograms<species, 2, false, NCuts>(track); // isMc always false here since it fills Matched/.. histos
