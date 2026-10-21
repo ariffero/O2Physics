@@ -92,7 +92,7 @@ struct UpcTrackVertexingQA {
   static constexpr float MassMuon = o2::constants::physics::MassMuon;
 
   // folders that contains plots for all tracks and associated tracks
-  static constexpr std::array<const char*, 5> TrackFolders = {"Trk/", "TrkColl/", "TrkAmb/", "Trk_TPC_tracks/", "Trk_kine_sel/"};
+  static constexpr std::array<const char*, 6> TrackFolders = {"Trk/", "TrkColl/", "TrkAmb/", "Trk_TPC_tracks/", "Trk_kine_sel/", "Trk_afterburner/"};
 
   // Name shortenings
   // passed* columns are in TrackSelectionExtension; isGlobalTrack* and trackCutFlag in TrackSelection
@@ -108,9 +108,9 @@ struct UpcTrackVertexingQA {
 
   // Ordered list of cuts. The cumulative cut flow follows this order,
   // so reorder CutLabels and getCutResults together to change what "tighter" means.
-  static constexpr int NCuts = 6;
+  static constexpr int NCuts = 7;
   static constexpr std::array<const char*, NCuts> CutLabels = {
-    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS"};
+    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS", "no ITS inner"};
   
   static constexpr int NCutsGen = 3;
   static constexpr std::array<const char*, NCutsGen> CutLabelsGen = {
@@ -168,6 +168,9 @@ struct UpcTrackVertexingQA {
 
     // track level plot for all TPC tracks after selection
     registry.addClone("Trk/", "Trk_kine_sel/");
+
+    // track level plots for afterburner tracks
+    registry.addClone("Trk/", "Trk_afterburner/");
 
     // track level plots for ambiguous tracks
     registry.addClone("Trk/", "TrkAmb/");
@@ -282,6 +285,17 @@ struct UpcTrackVertexingQA {
       return false;
     }
     if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[5], 1.);
+    if (earlyStop == 5) return true;
+
+    // track does not have clusters in the ITS inner barrel == afterburner tracks
+    //if (track.itsNClsInnerBarrel() > 0) {
+    //  return false;
+    //}
+    if (!track.isITSAfterburner()) {
+      return false;
+    }
+    if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[6], 1.);
+
 
     return true;
   }
@@ -353,6 +367,9 @@ struct UpcTrackVertexingQA {
       fillTrackHistograms<species, 3, false, 1>(track);
       // all TPC tracks after kinematic cuts
       fillTrackHistograms<species, 4, false, 4>(track);
+      // afterburner tracks
+      fillTrackHistograms<species, 5, false, 6>(track);
+
       if (collId < 0) {
         fillTrackHistograms<species, 2, false, NCuts>(track); // isMc always false here since it fills Matched/.. histos
       }
