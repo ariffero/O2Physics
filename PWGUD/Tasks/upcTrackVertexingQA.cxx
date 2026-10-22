@@ -57,6 +57,7 @@ struct UpcTrackVertexingQA {
   Configurable<float> ptTrackMin{"ptTrackMin", 0.1, "min. track pT (GeV/c)"};
   Configurable<float> etaTrackMax{"etaTrackMax", 0.9, "max. |eta| of tracks"};
   Configurable<int> nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
+  Configurable<bool> selectAfterburnerTracks{"selectAfterburnerTracks", true, "select ITS afterburner tracks, false to select tracks with ITS inner barrel clusters"};
 
   // Axes (the mass axis matches the default rho window; override it for the J/psi)
   ConfigurableAxis axisMass{"axisMass", {200, 0.5, 1.3}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
@@ -111,6 +112,9 @@ struct UpcTrackVertexingQA {
   static constexpr int NCuts = 7;
   static constexpr std::array<const char*, NCuts> CutLabels = {
     "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS", "is ITS afterburner"};
+
+  static constexpr std::array<const char*, NCuts> CutLabelsNoInner = {
+    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS", "no ITS inner"};
   
   static constexpr int NCutsGen = 3;
   static constexpr std::array<const char*, NCutsGen> CutLabelsGen = {
@@ -122,7 +126,11 @@ struct UpcTrackVertexingQA {
     registry.add("hEventSelectionCounter", "tracks surviving cuts applied in sequence;;entries", HistType::kTH1F, {{NCuts, -0.5, NCuts - 0.5}});
     auto hist = registry.get<TH1>(HIST("hEventSelectionCounter"));
     for (int i = 0; i < hist->GetNbinsX(); ++i) {
-      hist->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
+      if (selectAfterburnerTracks) {
+        hist->GetXaxis()->SetBinLabel(i + 1, CutLabels[i]);
+      } else {
+        hist->GetXaxis()->SetBinLabel(i + 1, CutLabelsNoInner[i]);
+        }
     }
 
     registry.add("hEventSelectionCounterGen", "tracks surviving cuts applied in sequence;;entries", HistType::kTH1F, {{NCutsGen, -0.5, NCutsGen - 0.5}});
@@ -152,12 +160,17 @@ struct UpcTrackVertexingQA {
     registry.add("Trk/hNSigmaVsP", ";#it{p} (GeV/#it{c});n#sigma^{TPC}", {HistType::kTH2F, {{200, 0., 2.}, {100, -10., 10.}}});
     registry.add("Trk/hHasIts", ";has ITS;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
     registry.add("Trk/hIsPvContrib", ";is PV contributor;entries", {HistType::kTH1F, {{2, -0.5, 1.5}}});
-    registry.add("Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{150-nMinTpcClusters, nMinTpcClusters, 150.}}});
     registry.add("Trk/hItsChi2NCl", ";#chi^{2}/N_{cls} ITS;entries", {HistType::kTH1F, {{100, 0., 10.}}});
     registry.add("Trk/hItsNCls", ";N_{cls} ITS;entries", {HistType::kTH1F, {{8, -0.5, 7.5}}});
     registry.add("Trk/hItsNClsInnerBarrel", ";N_{cls} ITS Inner Barrel;entries", {HistType::kTH1F, {{4, -0.5, 3.5}}});
     registry.add("Trk/hDcaXY", ";DCA_{xy} (cm);entries", {HistType::kTH1F, {{140, -0.035, 0.035}}});
     registry.add("Trk/hDcaZ", ";DCA_{z} (cm);entries", {HistType::kTH1F, {{200, -0.05, 0.05}}});
+
+    const double nClsMin = static_cast<double>(nMinTpcClusters);
+    const double nClsMax = 150.;
+    const int nClsBins = static_cast<int>(nClsMax - nClsMin);
+
+    registry.add("Trk/hTpcNClsFound", ";N_{cls} TPC;entries", {HistType::kTH1F, {{nClsBins, nClsMin, nClsMax}}});
 
     // track level (prongs of the candidate, after collision matching)
     registry.addClone("Trk/", "TrkColl/");
@@ -287,15 +300,19 @@ struct UpcTrackVertexingQA {
     if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[5], 1.);
     if (earlyStop == 5) return true;
 
-    // track does not have clusters in the ITS inner barrel == afterburner tracks
-    //if (track.itsNClsInnerBarrel() > 0) {
-    //  return false;
-    //}
-    if (!track.isITSAfterburner()) {
-      return false;
+    if (selectAfterburnerTracks) {
+      // track is assigned as ITS afterburner
+      if (!track.isITSAfterburner()) {
+        return false;
+      }
+      if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[6], 1.);
+    } else {
+      // track does not have clusters in the ITS inner barrel
+      if (track.itsNClsInnerBarrel() > 0) {
+        return false;
+      }
+      if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabelsNoInner[6], 1.);
     }
-    if (countEv) registry.get<TH1>(HIST("hEventSelectionCounter"))->Fill(CutLabels[6], 1.);
-
 
     return true;
   }
