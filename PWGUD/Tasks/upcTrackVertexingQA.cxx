@@ -110,7 +110,7 @@ struct UpcTrackVertexingQA {
   // so reorder CutLabels and getCutResults together to change what "tighter" means.
   static constexpr int NCuts = 7;
   static constexpr std::array<const char*, NCuts> CutLabels = {
-    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS", "no ITS inner"};
+    "All tracks", "has_TPC", "min TPC clusters","#it{p}_{T} cut", "#eta cut", "has_ITS", "is ITS afterburner"};
   
   static constexpr int NCutsGen = 3;
   static constexpr std::array<const char*, NCutsGen> CutLabelsGen = {
