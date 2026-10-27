@@ -58,6 +58,9 @@ struct UpcTrackVertexingQA {
   Configurable<float> etaTrackMax{"etaTrackMax", 0.9, "max. |eta| of tracks"};
   Configurable<int> nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
   Configurable<bool> selectAfterburnerTracks{"selectAfterburnerTracks", true, "select ITS afterburner tracks, false to select tracks with ITS inner barrel clusters"};
+  Configurable<bool> selectHadronicEvents{"selectHadronicEvents", false, "select only hadronic events"};
+  Configurable<bool> selectJpsiEvents{"selectJpsiEvents", false, "select only events whose genId is EmbJpsiGenId (51)"};
+  Configurable<bool> selectRhoEvents{"selectRhoEvents", false, "select only rho events whose genId is EmbRhoGenId (52)"};
 
   // Axes (the mass axis matches the default rho window; override it for the J/psi)
   ConfigurableAxis axisMass{"axisMass", {200, 0.5, 1.3}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
@@ -88,6 +91,9 @@ struct UpcTrackVertexingQA {
   // constants
   static constexpr unsigned int TwoTracks = 2;
   static constexpr int UnassignedDCA = 999;
+  static constexpr int HadronicGenId = 127;
+  static constexpr int EmbJpsiGenId = 51;
+  static constexpr int EmbRhoGenId = 52;
 
   static constexpr float MassPion = o2::constants::physics::MassPionCharged;
   static constexpr float MassMuon = o2::constants::physics::MassMuon;
@@ -198,8 +204,9 @@ struct UpcTrackVertexingQA {
     registry.add("Cand/hPtVsRapidity", ";#it{p}_{T} (GeV/#it{c});#it{y}", {HistType::kTH2F, {axisPt, axisY}});
 
     // MC histograms are only booked if at least one MC process function is enabled
-    const bool needMc = doprocessRhoTracksBeforeGroupingMcInfo || doprocessJpsiTracksBeforeGroupingMcInfo ||
-                        doprocessRhoCandMcInfo || doprocessJpsiCandMcInfo || doprocessMcGenExclusive || doprocessMcGenEmbedded;
+    const bool needMc = doprocessRhoTracksBeforeGroupingMcExclusive || doprocessJpsiTracksBeforeGroupingMcExclusive || doprocessJpsiTracksBeforeGroupingMcEmbedded || doprocessRhoTracksBeforeGroupingMcEmbedded ||
+                        doprocessRhoCandMcExclusive || doprocessJpsiCandMcExclusive || doprocessRhoCandMcEmbedded || doprocessJpsiCandMcEmbedded ||
+                        doprocessMcGenExclusive || doprocessMcGenEmbedded;
     if (!needMc) {
       return;
     }
@@ -332,9 +339,42 @@ struct UpcTrackVertexingQA {
   //--------------------------------------------------------------------------------
   // fills the histograms with info on track properties
   // works for both all and associated tracks, and if MC is available or not
-  template <CandSpecies species, int folder, bool isMc, int earlyStop, typename TTrack>
+  template <CandSpecies species, int folder, bool isMc, bool isEmbedded, int earlyStop, typename TTrack>
   void fillTrackHistograms(TTrack const& track)
   {
+    if constexpr (isMc) {
+      if (selectHadronicEvents && (selectJpsiEvents || selectRhoEvents)) {
+        LOGF(fatal, "Both selectHadronicEvents and selectJpsiEvents/selectRhoEvents are true. Please select at most one.");
+        return;
+      }
+      if (track.has_collision()) {
+        auto collision = track.template collision_as<CollisionsWithMc>();
+        if (collision.has_mcCollision()) {
+          auto mcColl = collision.template mcCollision_as<aod::McCollisions>();
+          int sourceId = mcColl.getSourceId();
+          int genId = mcColl.getGeneratorId();
+          if constexpr (isEmbedded) {
+            if (!sourceId) {
+              return;
+            }
+            if (selectHadronicEvents && genId != HadronicGenId) {
+              return;
+            }
+            if (selectJpsiEvents && genId != EmbJpsiGenId) {
+              return;
+            }
+            if (selectRhoEvents && genId != EmbRhoGenId) {
+              return;
+            }
+          } else {
+            if (sourceId) {
+              LOGF(fatal, "Source Id: {%d} is not zero for non-embedded MC", sourceId);
+              return;
+            }
+          }
+        }
+      }
+    }
     // fill the histos only for good tracks
     if (!isGoodTrack(track, folder==0, earlyStop)) {
       return;
@@ -373,29 +413,29 @@ struct UpcTrackVertexingQA {
 
   //--------------------------------------------------------------------------------
   // loop over tracks and fill the histograms with info on track properties
-  template <CandSpecies species, bool isMc, typename TTrack>
+  template <CandSpecies species, bool isMc, bool isEmbedded, typename TTrack>
   void loopOverTracksBeforeGrouping(TTrack const& tracks)
   {
     for (auto const& track : tracks) {
       int32_t collId = track.collisionId();
       // selected tracks
-      fillTrackHistograms<species, 0, isMc, NCuts>(track);
+      fillTrackHistograms<species, 0, isMc, isEmbedded, NCuts>(track);
       // all TPC tracks
-      fillTrackHistograms<species, 3, false, 1>(track);
+      fillTrackHistograms<species, 3, false, isEmbedded, 1>(track);
       // all TPC tracks after kinematic cuts
-      fillTrackHistograms<species, 4, false, 4>(track);
+      fillTrackHistograms<species, 4, false, isEmbedded, 4>(track);
       // afterburner tracks
-      fillTrackHistograms<species, 5, false, 6>(track);
+      fillTrackHistograms<species, 5, false, isEmbedded, 6>(track);
 
       if (collId < 0) {
-        fillTrackHistograms<species, 2, false, NCuts>(track); // isMc always false here since it fills Matched/.. histos
+        fillTrackHistograms<species, 2, false, isEmbedded, NCuts>(track); // isMc always false here since it fills Matched/.. histos
       }
     }
   }
 
   //--------------------------------------------------------------------------------
   // fills the histograms with info on candidate properties
-  template <CandSpecies species, bool isMc, typename TTrack, typename TCollision>
+  template <CandSpecies species, bool isMc, bool isEmbedded, typename TTrack, typename TCollision>
   void fillCandidateHistograms(TCollision const& collision, TTrack const& tracks, float candMass)
   {
     registry.fill(HIST("Coll/hNContrib"), collision.numContrib());
@@ -420,7 +460,7 @@ struct UpcTrackVertexingQA {
       if (isGoodTrack(track)) {
         goodTracks.push_back(track);
         // use TrkColl directory
-        fillTrackHistograms<species, 1, isMc, NCuts>(track);
+        fillTrackHistograms<species, 1, isMc, isEmbedded, NCuts>(track);
       }
     }
 
@@ -572,54 +612,80 @@ struct UpcTrackVertexingQA {
   // look at all tracks
   void processRhoTracksBeforeGrouping(TracksExtraWPidPi const& tracks)
   {
-    loopOverTracksBeforeGrouping<CandSpecies::kRho, false>(tracks);
+    loopOverTracksBeforeGrouping<CandSpecies::kRho, false, false>(tracks);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGrouping, "Process rho tracks before asking for collisions", true);
 
   void processJpsiTracksBeforeGrouping(TracksExtraWPidMu const& tracks)
   {
-    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, false>(tracks);
+    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, false, false>(tracks);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGrouping, "Process J/Psi tracks before asking for collisions", false);
 
-  void processRhoTracksBeforeGroupingMcInfo(TracksExtraWPidPiMc const& tracks, aod::McParticles const&)
+  void processRhoTracksBeforeGroupingMcExclusive(TracksExtraWPidPiMc const& tracks, aod::McParticles const&, CollisionsWithMc const&, aod::McCollisions const&)
   {
-    loopOverTracksBeforeGrouping<CandSpecies::kRho, true>(tracks);
+    loopOverTracksBeforeGrouping<CandSpecies::kRho, true, false>(tracks);
   }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGroupingMcInfo, "Process rho tracks before asking for collisions", false);
+  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGroupingMcExclusive, "Process rho tracks before asking for collisions", false);
 
-  void processJpsiTracksBeforeGroupingMcInfo(TracksExtraWPidMuMc const& tracks, aod::McParticles const&)
+  void processRhoTracksBeforeGroupingMcEmbedded(TracksExtraWPidPiMc const& tracks, aod::McParticles const&, CollisionsWithMc const&, aod::McCollisions const&)
   {
-    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, true>(tracks);
+    loopOverTracksBeforeGrouping<CandSpecies::kRho, true, true>(tracks);
   }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGroupingMcInfo, "Process J/Psi tracks before asking for collisions", false);
+  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGroupingMcEmbedded, "Process rho tracks before asking for collisions", false);
+
+  void processJpsiTracksBeforeGroupingMcExclusive(TracksExtraWPidMuMc const& tracks, aod::McParticles const&, CollisionsWithMc const&, aod::McCollisions const&)
+  {
+    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, true, false>(tracks);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGroupingMcExclusive, "Process J/Psi tracks before asking for collisions", false);
+
+  void processJpsiTracksBeforeGroupingMcEmbedded(TracksExtraWPidMuMc const& tracks, aod::McParticles const&, CollisionsWithMc const&, aod::McCollisions const&)
+  {
+    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, true, true>(tracks);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGroupingMcEmbedded, "Process J/Psi tracks before asking for collisions", false);
 
   // look at matched tracks
   void processRhoCand(aod::Collision const& collision, TracksExtraWPidPi const& tracks)
   {
-    fillCandidateHistograms<CandSpecies::kRho, false>(collision, tracks, MassPion);
+    fillCandidateHistograms<CandSpecies::kRho, false, false>(collision, tracks, MassPion);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processRhoCand, "Rho -> pi pi candidates and track QA", true);
 
   void processJpsiCand(aod::Collision const& collision, TracksExtraWPidMu const& tracks)
   {
-    fillCandidateHistograms<CandSpecies::kJpsi, false>(collision, tracks, MassMuon);
+    fillCandidateHistograms<CandSpecies::kJpsi, false, false>(collision, tracks, MassMuon);
   }
   PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiCand, "J/Psi -> mu mu candidates and track QA", false);
 
-  void processRhoCandMcInfo(CollisionsWithMc::iterator const& collision, TracksExtraWPidPiMc const& tracks,
+  void processRhoCandMcExclusive(CollisionsWithMc::iterator const& collision, TracksExtraWPidPiMc const& tracks,
                             aod::McParticles const&, aod::McCollisions const&)
   {
-    fillCandidateHistograms<CandSpecies::kRho, true>(collision, tracks, MassPion);
+    fillCandidateHistograms<CandSpecies::kRho, true, false>(collision, tracks, MassPion);
   }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoCandMcInfo, "Rho -> pi pi candidates and track QA", false);
+  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoCandMcExclusive, "Rho -> pi pi candidates and track QA", false);
 
-  void processJpsiCandMcInfo(CollisionsWithMc::iterator const& collision, TracksExtraWPidMuMc const& tracks,
+  void processRhoCandMcEmbedded(CollisionsWithMc::iterator const& collision, TracksExtraWPidPiMc const& tracks,
+                            aod::McParticles const&, aod::McCollisions const&)
+  {
+    fillCandidateHistograms<CandSpecies::kRho, true, true>(collision, tracks, MassPion);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoCandMcEmbedded, "Rho -> pi pi candidates and track QA", false);
+
+  void processJpsiCandMcExclusive(CollisionsWithMc::iterator const& collision, TracksExtraWPidMuMc const& tracks,
                              aod::McParticles const&, aod::McCollisions const&)
   {
-    fillCandidateHistograms<CandSpecies::kJpsi, true>(collision, tracks, MassMuon);
+    fillCandidateHistograms<CandSpecies::kJpsi, true, false>(collision, tracks, MassMuon);
   }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiCandMcInfo, "J/Psi -> mu mu candidates and track QA", false);
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiCandMcExclusive, "J/Psi -> mu mu candidates and track QA", false);
+
+  void processJpsiCandMcEmbedded(CollisionsWithMc::iterator const& collision, TracksExtraWPidMuMc const& tracks,
+                             aod::McParticles const&, aod::McCollisions const&)
+  {
+    fillCandidateHistograms<CandSpecies::kJpsi, true, true>(collision, tracks, MassMuon);
+  }
+  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiCandMcEmbedded, "J/Psi -> mu mu candidates and track QA", false);
 
   // look at gen MC
   void processMcGenEmbedded(aod::McCollision const& mcCollision, aod::McParticles const& mcParticles)
