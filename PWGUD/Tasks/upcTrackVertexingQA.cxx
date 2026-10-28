@@ -58,9 +58,7 @@ struct UpcTrackVertexingQA {
   Configurable<float> etaTrackMax{"etaTrackMax", 0.9, "max. |eta| of tracks"};
   Configurable<int> nMinTpcClusters{"nMinTpcClusters", 60, "min. number of TPC clusters"};
   Configurable<bool> selectAfterburnerTracks{"selectAfterburnerTracks", true, "select ITS afterburner tracks, false to select tracks with ITS inner barrel clusters"};
-  Configurable<bool> selectHadronicEvents{"selectHadronicEvents", false, "select only hadronic events"};
-  Configurable<bool> selectJpsiEvents{"selectJpsiEvents", false, "select only events whose genId is EmbJpsiGenId (51)"};
-  Configurable<bool> selectRhoEvents{"selectRhoEvents", false, "select only rho events whose genId is EmbRhoGenId (52)"};
+  Configurable<std::vector<int>> acceptedGeneratorIds{"acceptedGeneratorIds", {52}, "Accepted MC generator IDs"};
 
   // Axes (the mass axis matches the default rho window; override it for the J/psi)
   ConfigurableAxis axisMass{"axisMass", {200, 0.5, 1.3}, "m_{#pi#pi} (GeV/#it{c}^{2})"};
@@ -91,9 +89,6 @@ struct UpcTrackVertexingQA {
   // constants
   static constexpr unsigned int TwoTracks = 2;
   static constexpr int UnassignedDCA = 999;
-  static constexpr int HadronicGenId = 127;
-  static constexpr int EmbJpsiGenId = 51;
-  static constexpr int EmbRhoGenId = 52;
 
   static constexpr float MassPion = o2::constants::physics::MassPionCharged;
   static constexpr float MassMuon = o2::constants::physics::MassMuon;
@@ -144,10 +139,6 @@ struct UpcTrackVertexingQA {
     for (int i = 0; i < hist->GetNbinsX(); ++i) {
       hist->GetXaxis()->SetBinLabel(i + 1, CutLabelsGen[i]);
     }
-
-    //registry.get<TH1>(HIST("hEventSelectionCounter"))->GetXaxis()->SetBinLabel(3, Form("> %d TPC clusters", nMinTpcClusters));
-    //registry.get<TH1>(HIST("hEventSelectionCounter"))->GetXaxis()->SetBinLabel(4, Form("#it{p}_{T} > %.2f", ptTrackMin));
-    //registry.get<TH1>(HIST("hEventSelectionCounter"))->GetXaxis()->SetBinLabel(5, Form("|#eta| < %.2f",etaTrackMax));
 
     // collision level
     registry.add("Coll/hNContrib", ";N_{PV contributors};entries", {HistType::kTH1F, {{10, -0.5, 9.5}}});
@@ -343,36 +334,23 @@ struct UpcTrackVertexingQA {
   void fillTrackHistograms(TTrack const& track)
   {
     if constexpr (isMc) {
-      if (selectHadronicEvents && (selectJpsiEvents || selectRhoEvents)) {
-        LOGF(fatal, "Both selectHadronicEvents and selectJpsiEvents/selectRhoEvents are true. Please select at most one.");
+      if (!track.has_mcParticle()) {
+        LOGF(info, "Track does not have mcParticle");
         return;
       }
-      if (track.has_collision()) {
-        auto collision = track.template collision_as<CollisionsWithMc>();
-        if (collision.has_mcCollision()) {
-          auto mcColl = collision.template mcCollision_as<aod::McCollisions>();
-          int sourceId = mcColl.getSourceId();
-          int genId = mcColl.getGeneratorId();
-          if constexpr (isEmbedded) {
-            if (!sourceId) {
-              return;
-            }
-            if (selectHadronicEvents && genId != HadronicGenId) {
-              return;
-            }
-            if (selectJpsiEvents && genId != EmbJpsiGenId) {
-              return;
-            }
-            if (selectRhoEvents && genId != EmbRhoGenId) {
-              return;
-            }
-          } else {
-            if (sourceId) {
-              LOGF(fatal, "Source Id: {%d} is not zero for non-embedded MC", sourceId);
-              return;
-            }
-          }
-        }
+      auto mcParticle = track.template mcParticle_as<aod::McParticles>();
+
+      if (!mcParticle.has_mcCollision()) {
+        LOGF(info, "mcPart does not have mcCollision");
+        return;
+      }
+
+      auto mcColl = mcParticle.template mcCollision_as<aod::McCollisions>();
+      int genId = mcColl.getGeneratorId();
+
+      const auto& acceptedIds = acceptedGeneratorIds.value;
+      if (std::find(acceptedIds.begin(), acceptedIds.end(), genId) == acceptedIds.end()) {
+        return;
       }
     }
     // fill the histos only for good tracks
@@ -539,18 +517,23 @@ struct UpcTrackVertexingQA {
     registry.fill(HIST("McGen/Part/hTrackSizePerEvent"), goodMcGenParticles.size());
 
     // consider only j/psi->mumu and rho->pipi events
-    auto sourceId = mcCollision.getSourceId();
+    auto genId = mcCollision.getGeneratorId();
 
-    if constexpr (isEmbedded) {
-      if (!sourceId) {
-        return;
-      }
-    } else {
-      if (sourceId) {
-        LOGF(fatal, "Source Id: {%d} is not zero for non-embedded MC", sourceId);
-        return;
-      }
+    const auto& acceptedIds = acceptedGeneratorIds.value;
+    if (std::find(acceptedIds.begin(), acceptedIds.end(), genId) == acceptedIds.end()) {
+      return;
     }
+
+    //if constexpr (isEmbedded) {
+    //  if (!sourceId) {
+    //    return;
+    //  }
+    //} else {
+    //  if (sourceId) {
+    //    LOGF(fatal, "Source Id: {%d} is not zero for non-embedded MC", sourceId);
+    //    return;
+    //  }
+    //}
 
     if (goodMcGenParticles.size() != TwoTracks) {
       return;
@@ -609,18 +592,6 @@ struct UpcTrackVertexingQA {
     }
   }
 
-  // look at all tracks
-  void processRhoTracksBeforeGrouping(TracksExtraWPidPi const& tracks)
-  {
-    loopOverTracksBeforeGrouping<CandSpecies::kRho, false, false>(tracks);
-  }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processRhoTracksBeforeGrouping, "Process rho tracks before asking for collisions", true);
-
-  void processJpsiTracksBeforeGrouping(TracksExtraWPidMu const& tracks)
-  {
-    loopOverTracksBeforeGrouping<CandSpecies::kJpsi, false, false>(tracks);
-  }
-  PROCESS_SWITCH(UpcTrackVertexingQA, processJpsiTracksBeforeGrouping, "Process J/Psi tracks before asking for collisions", false);
 
   void processRhoTracksBeforeGroupingMcExclusive(TracksExtraWPidPiMc const& tracks, aod::McParticles const&, CollisionsWithMc const&, aod::McCollisions const&)
   {
